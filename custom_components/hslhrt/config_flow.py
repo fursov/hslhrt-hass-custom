@@ -144,10 +144,10 @@ async def validate_user_config(hass: core.HomeAssistant, data):
         else:
             ret_route = route
 
-        if (route.lower() != ALL) and (ret_route == None):
+        if (route.lower() != ALL) and (ret_route is None):
             errors = "invalid_route"
         else:
-            if (dest.lower() != ALL) and (ret_dest == None):
+            if (dest.lower() != ALL) and (ret_dest is None):
                 errors = "invalid_destination"
     else:
         _LOGGER.error("Name or gtfs is blank")

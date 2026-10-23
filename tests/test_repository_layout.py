@@ -33,6 +33,11 @@ def test_one_hacs_integration_in_standard_layout():
 def test_manifest_metadata_and_version():
     manifest = load_json(INTEGRATION / "manifest.json")
     assert manifest["domain"] == "hslhrt"
+    assert list(manifest) == [
+        "domain",
+        "name",
+        *sorted(key for key in manifest if key not in ("domain", "name")),
+    ]
     assert manifest["version"] == "0.3.5"
     assert manifest["config_flow"] is True
     assert manifest["documentation"].startswith("https://github.com/fursov/")
@@ -53,6 +58,11 @@ def test_translations_match_source_strings():
     assert load_json(INTEGRATION / "strings.json") == load_json(
         INTEGRATION / "translations" / "en.json"
     )
+
+
+def test_config_entry_only_schema_declared():
+    source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+    assert "CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)" in source
 
 
 def test_python_sources_parse():
