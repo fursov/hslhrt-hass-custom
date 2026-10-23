@@ -25,11 +25,11 @@ from .const import (
     DOMAIN,
     MAX_DEPARTURES_ATTRIBUTE,
     MAX_LEGACY_ROUTES,
-    ROUTE,
     STOP_CODE,
     STOP_GTFS,
     STOP_NAME,
 )
+from .configuration import effective_filters
 from .schedule import upcoming_departures
 
 
@@ -53,11 +53,14 @@ class HSLHRTBaseSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, config_entry) -> None:
         super().__init__(coordinator)
         config = config_entry.data
-        route = config.get(ROUTE) or ALL
-        destination = config.get(DESTINATION) or ALL
+        route, destination, routes = effective_filters(
+            config, config_entry.options
+        )
         suffix = (
-            route.upper()
-            if route.casefold() != ALL
+            ", ".join(routes)
+            if routes
+            else route.upper()
+            if routes is None and route.casefold() != ALL
             else destination.upper()
             if destination.casefold() != ALL
             else "ALL"

@@ -10,6 +10,11 @@ NAME = DEFAULT_NAME = "HSLHRT"
 MANUFACTURER = "Helsinki Regional Transport Authority"
 COORDINATOR = "coordinator"
 MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=1)
+DEFAULT_SCAN_INTERVAL = 1
+CONF_SCAN_INTERVAL = "scan_interval"
+CONF_ROUTES = "routes_filter"
+CONF_DESTINATION_FILTER = "destination_filter"
+CONF_SELECTED_STOP = "selected_stop"
 UNDO_UPDATE_LISTENER = "undo_update_listener"
 
 BASE_URL = "https://api.digitransit.fi/routing/v2/hsl/gtfs/v1"
