@@ -144,3 +144,14 @@ def test_multiple_route_filter_and_destination_precedence():
     # Existing route-only entries still use the v0.5 filtering semantics.
     rows = schedule.parse_departures(stop, "8", "East")["routes"]
     assert [r["route"] for r in rows] == ["8"]
+
+
+
+def test_route_mode_from_routing_api_does_not_change_timetable_filtering():
+    row = departure(1792702800, 900, route="M1")
+    row["trip"]["route"]["mode"] = "SUBWAY"
+    parsed = schedule.parse_departures(make_stop([row]), route_filter="M1")
+    assert len(parsed["routes"]) == 1
+    assert parsed["routes"][0]["vehicle_mode"] == "SUBWAY"
+    row["trip"]["route"]["mode"] = None
+    assert schedule.parse_departures(make_stop([row]))["routes"][0]["vehicle_mode"] is None

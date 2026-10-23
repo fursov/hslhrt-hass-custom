@@ -4,6 +4,7 @@ No MQTT message may change the Routing v2 timetable. MQTT is best-effort:
 unmatched and stale vehicles are kept out of the published positions.
 """
 
+import asyncio
 import json
 import math
 import ssl
@@ -167,6 +168,10 @@ class HFPManager:
         self._client = None
         self._targets: dict[TripKey, dict] = {}
         self._topics: frozenset[str] = frozenset()
+        # These are the topics acknowledged by the current broker connection.
+        self._subscribed_topics: frozenset[str] = frozenset()
+        self._connection_generation = 0
+        self._subscription_task: asyncio.Task | None = None
         self._positions: dict[TripKey, dict] = {}
         self._listeners: set[Callable[[], None]] = set()
         self._remove_coordinator = None
@@ -201,22 +206,65 @@ class HFPManager:
         for key in tuple(self._positions):
             if key not in targets:
                 del self._positions[key]
-        if self._client and old != desired:
-            # Broker operations may involve socket I/O; never call in HA loop.
-            self.hass.async_create_task(
-                self.hass.async_add_executor_job(
-                    self._change_subscriptions, old - desired, desired - old
-                )
-            )
+        if old != desired:
+            self._schedule_subscription_sync()
         self._notify(force=True)
 
-    def _change_subscriptions(self, remove, add) -> None:
-        if not self._client:
+    def _schedule_subscription_sync(self) -> None:
+        """Schedule a coroutine, never wrap an executor Future in a Task."""
+        if self._stopping or not self.connected or self._client is None:
             return
-        for topic in remove:
-            self._client.unsubscribe(topic)
-        for topic in add:
-            self._client.subscribe(topic, qos=0)
+        if self._subscription_task is None or self._subscription_task.done():
+            self._subscription_task = self.hass.async_create_task(
+                self._async_sync_subscriptions()
+            )
+
+    def _change_subscriptions(
+        self, remove: frozenset[str], add: frozenset[str]
+    ) -> tuple[frozenset[str], frozenset[str]]:
+        """Run paho calls in an executor and return successfully changed topics."""
+        client = self._client
+        if client is None:
+            return frozenset(), frozenset()
+        removed = set()
+        added = set()
+        for topic in sorted(remove):
+            result, _mid = client.unsubscribe(topic)
+            if result == 0:
+                removed.add(topic)
+            else:
+                _LOGGER.warning("HFP MQTT unsubscribe failed for %s: %s", topic, result)
+        for topic in sorted(add):
+            result, _mid = client.subscribe(topic, qos=0)
+            if result == 0:
+                added.add(topic)
+            else:
+                _LOGGER.warning("HFP MQTT subscribe failed for %s: %s", topic, result)
+        return frozenset(removed), frozenset(added)
+
+    async def _async_sync_subscriptions(self) -> None:
+        """Serialize broker changes and converge after rapid timetable updates."""
+        while not self._stopping and self.connected and self._client is not None:
+            desired = self._topics
+            applied = self._subscribed_topics
+            if desired == applied:
+                return
+            generation = self._connection_generation
+            try:
+                removed, added = await self.hass.async_add_executor_job(
+                    self._change_subscriptions, applied - desired, desired - applied
+                )
+            except Exception:
+                _LOGGER.exception("Failed to update HFP MQTT subscriptions")
+                return
+            # Discard results from a disconnected broker session. A reconnect
+            # resets the applied topics, and the loop will resubscribe.
+            if generation != self._connection_generation:
+                continue
+            self._subscribed_topics = (applied - removed) | added
+            if self._subscribed_topics == applied:
+                # Broker rejected the operations; retry on the next refresh.
+                return
 
     def _open_worker(self) -> None:
         """All TLS setup and thread creation happen outside the HA event loop."""
@@ -230,12 +278,10 @@ class HFPManager:
         client.reconnect_delay_set(min_delay=2, max_delay=60)
 
         def on_connect(_client, _userdata, _flags, reason_code, _properties):
+            # Only the Home Assistant loop may modify subscription state.
             self.hass.loop.call_soon_threadsafe(
                 self._set_connected, not reason_code.is_failure
             )
-            if not reason_code.is_failure:
-                for topic in self._topics:
-                    _client.subscribe(topic, qos=0)
 
         def on_disconnect(_client, _userdata, _flags, _reason, _properties):
             self.hass.loop.call_soon_threadsafe(self._set_connected, False)
@@ -250,14 +296,19 @@ class HFPManager:
         client.on_connect = on_connect
         client.on_disconnect = on_disconnect
         client.on_message = on_message
+        self._client = client
         client.connect_async(HFP_HOST, HFP_PORT, keepalive=60)
         client.loop_start()
-        self._client = client
 
     def _set_connected(self, value: bool) -> None:
-        if not self._stopping:
-            self.connected = value
-            self._notify(force=True)
+        if self._stopping:
+            return
+        self._connection_generation += 1
+        self.connected = value
+        # Every MQTT reconnect has a fresh broker subscription session.
+        self._subscribed_topics = frozenset()
+        self._schedule_subscription_sync()
+        self._notify(force=True)
 
     def _accept_position(self, key: TripKey, position: dict) -> None:
         """Never accept a position from a journey not selected by Routing."""
@@ -280,6 +331,7 @@ class HFPManager:
             )
             row = {
                 "route": trip.get("route"),
+                "vehicle_mode": trip.get("vehicle_mode"),
                 "destination": trip.get("destination"),
                 "arrival_datetime": trip.get("arrival_datetime"),
                 "hfp_route_id": key[0],
@@ -299,7 +351,9 @@ class HFPManager:
             self._refresh_targets
         )
         self._remove_timer = async_track_time_interval(
-            self.hass, lambda _now: self._notify(force=True), timedelta(seconds=30)
+            self.hass,
+            lambda _now: (self._schedule_subscription_sync(), self._notify(force=True)),
+            timedelta(seconds=30),
         )
         self._refresh_targets()
         try:
@@ -324,6 +378,9 @@ class HFPManager:
         if self._remove_timer:
             self._remove_timer()
             self._remove_timer = None
+        if self._subscription_task is not None:
+            await self._subscription_task
+            self._subscription_task = None
         await self.hass.async_add_executor_job(self._close_worker)
         self._listeners.clear()
         self._targets.clear()

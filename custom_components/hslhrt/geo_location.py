@@ -15,6 +15,7 @@ from homeassistant.const import ATTR_ATTRIBUTION, UnitOfLength
 from homeassistant.util.location import distance as distance_meters
 
 from .const import ATTRIBUTION, DOMAIN, GEO_LOCATION_CONTROLLER, HFP_MANAGER
+from .vehicle import marker_label, vehicle_icon
 
 SOURCE = DOMAIN
 
@@ -64,7 +65,7 @@ class HSLHRTVehicleLocation(GeolocationEvent):
     """A vehicle on one scheduled journey, not a persistent device."""
 
     _attr_should_poll = False
-    _attr_icon = "mdi:bus"
+    _attr_icon = "mdi:map-marker"
     _attr_unit_of_measurement = UnitOfLength.KILOMETERS
 
     def __init__(self, hass, entry, key, position) -> None:
@@ -83,6 +84,11 @@ class HSLHRTVehicleLocation(GeolocationEvent):
             f"{position.get('destination') or ''} "
             f"({entry.data.get('stop_code', '')})"
         )
+
+    @property
+    def icon(self) -> str:
+        """Match the documented Digitransit transport mode where known."""
+        return vehicle_icon(self._position.get("vehicle_mode"))
 
     @property
     def source(self) -> str:
@@ -118,6 +124,10 @@ class HSLHRTVehicleLocation(GeolocationEvent):
             ATTR_ATTRIBUTION: ATTRIBUTION,
             "stop_code": self._stop_code,
             "route": self._position.get("route"),
+            "vehicle_mode": self._position.get("vehicle_mode"),
+            "marker_label": marker_label(
+                self._position.get("route"), self._position.get("vehicle_mode")
+            ),
             "destination": self._position.get("destination"),
             "arrival_datetime": self._position.get("arrival_datetime"),
             "hfp_route_id": self._key[0],
