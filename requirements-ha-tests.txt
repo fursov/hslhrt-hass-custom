@@ -1,0 +1,4 @@
+# Keep HA Core and the extracted pytest helpers on a reproducible baseline.
+# Update together to test newer HA releases.
+homeassistant==2026.10.2
+pytest-homeassistant-custom-component==0.13.373

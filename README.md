@@ -8,6 +8,32 @@ Digitransit requires a free subscription key. Register and obtain yours at https
 
 **Upgrading from 0.3.5:** Existing configured stops are retained. After updating, Home Assistant asks you to **Reauthenticate** the integration to add an API key. Do not delete the old stop entries. You can also use **Reconfigure** to rotate a key.
 
+## Developer testing (PR7)
+
+PR7 adds a separate suite using the real Home Assistant Core loader, config-entry
+manager, sensors and entity registry. Digitransit network requests are mocked;
+no API key or running Home Assistant server is needed.
+
+```bash
+# Fast tests (Python 3.13; existing lightweight HA stubs)
+python -m pip install pytest ruff aiohttp voluptuous
+python -m pytest -q tests --ignore=tests/integration
+
+# Real HA integration tests (Python 3.14; separate virtual environment)
+python -m pip install -r requirements-ha-tests.txt
+python -m pytest -q -p pytest_homeassistant_custom_component tests/integration
+```
+
+The suites must run in **separate Python processes**: existing unit tests
+insert stub `homeassistant` modules into `sys.modules`, whereas integration
+tests import real Home Assistant libraries. CI enforces both suites separately.
+
+The integration job uses a pinned HA version and pinned test-fixture plugin,
+and runs on every PR, push to `main`, and weekly. It detects problems such as
+obsolete Home Assistant imports that simple syntax and mocked tests miss.
+
+This PR changes no runtime integration code or manifest version.
+
 ## Installation
 
 ### HACS (custom repository)

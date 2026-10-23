@@ -26,7 +26,7 @@ jobs:
       - name: Check Python syntax
         run: python -m compileall -q custom_components/hslhrt
       - name: Pytest
-        run: python -m pytest -q
+        run: python -m pytest -q tests --ignore=tests/integration
 
   hassfest:
     name: Hassfest
