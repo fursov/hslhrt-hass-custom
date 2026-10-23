@@ -224,7 +224,8 @@ async def test_stop_marker_follows_coordinator_location_and_missing_coordinates(
     updated.update(lat=60.25, lon=24.85)
     api.get_departures = AsyncMock(return_value=updated)
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    await coordinator.async_request_refresh()
+    # Force each immediate response; async_request_refresh debounces rapid calls.
+    await coordinator.async_refresh()
     await hass.async_block_till_done()
     moved = hass.states.get(stable_id)
     assert moved is not None
@@ -234,12 +235,12 @@ async def test_stop_marker_follows_coordinator_location_and_missing_coordinates(
     invalid = stop_response()
     invalid.update(lat=None, lon=24.85)
     api.get_departures = AsyncMock(return_value=invalid)
-    await coordinator.async_request_refresh()
+    await coordinator.async_refresh()
     await hass.async_block_till_done()
     assert hass.states.async_all("geo_location") == []
 
     api.get_departures = AsyncMock(return_value=stop_response())
-    await coordinator.async_request_refresh()
+    await coordinator.async_refresh()
     await hass.async_block_till_done()
     assert hass.states.get(stable_id) is not None
 
