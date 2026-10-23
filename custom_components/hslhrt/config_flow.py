@@ -24,11 +24,16 @@ from .configuration import (
 from .const import (
     ALL,
     CONF_API_KEY,
+    CONF_HFP_ENABLED,
+    CONF_HFP_HORIZON,
+    CONF_HFP_PER_ROUTE,
     CONF_DESTINATION_FILTER,
     CONF_ROUTES,
     CONF_SCAN_INTERVAL,
     CONF_SELECTED_STOP,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_HFP_HORIZON,
+    DEFAULT_HFP_PER_ROUTE,
     DESTINATION,
     DOMAIN,
     NAME_CODE,
@@ -408,6 +413,13 @@ class HSLHRTOptionsFlow(config_entries.OptionsFlow):
                         CONF_ROUTES: sorted(set(selected), key=str.casefold),
                         CONF_DESTINATION_FILTER: destination,
                         CONF_SCAN_INTERVAL: interval,
+                        CONF_HFP_ENABLED: user_input.get(CONF_HFP_ENABLED, False),
+                        CONF_HFP_HORIZON: user_input.get(
+                            CONF_HFP_HORIZON, DEFAULT_HFP_HORIZON
+                        ),
+                        CONF_HFP_PER_ROUTE: user_input.get(
+                            CONF_HFP_PER_ROUTE, DEFAULT_HFP_PER_ROUTE
+                        ),
                     },
                 )
 
@@ -443,6 +455,22 @@ class HSLHRTOptionsFlow(config_entries.OptionsFlow):
                 vol.Required(
                     CONF_SCAN_INTERVAL, default=interval_default
                 ): vol.In([1, 2, 3, 5, 10, 15, 30]),
+                vol.Optional(
+                    CONF_HFP_ENABLED,
+                    default=entry.options.get(CONF_HFP_ENABLED, False),
+                ): bool,
+                vol.Required(
+                    CONF_HFP_HORIZON,
+                    default=entry.options.get(
+                        CONF_HFP_HORIZON, DEFAULT_HFP_HORIZON
+                    ),
+                ): vol.In([15, 30, 45, 60, 90]),
+                vol.Required(
+                    CONF_HFP_PER_ROUTE,
+                    default=entry.options.get(
+                        CONF_HFP_PER_ROUTE, DEFAULT_HFP_PER_ROUTE
+                    ),
+                ): vol.In([1, 2, 3, 4, 5]),
             }
         )
         return self.async_show_form(

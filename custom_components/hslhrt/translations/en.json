@@ -52,11 +52,14 @@
     "step": {
       "init": {
         "title": "Stop preferences",
-        "description": "Select zero routes to include all routes. A nonempty route selection takes precedence over destination. Changes reload the integration.",
+        "description": "Choose routes, refresh interval and optional GPS tracking of multiple next journeys. GPS may be unavailable; timetables keep working.",
         "data": {
           "routes_filter": "Routes (empty = all)",
           "destination_filter": "Destination filter (ALL = any)",
-          "scan_interval": "Refresh interval (minutes)"
+          "scan_interval": "Refresh interval (minutes)",
+          "track_vehicles": "Track GPS positions of upcoming vehicles (HFP)",
+          "tracking_horizon_minutes": "GPS tracking lookahead (minutes)",
+          "tracking_per_route": "Upcoming trips to track per route"
         }
       }
     },
