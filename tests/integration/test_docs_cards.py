@@ -162,6 +162,7 @@ def test_current_ui_screenshots_exist_and_are_linked():
     screenshots = (
         "configure-stop.png",
         "select-stop.png",
+        "stop-options-compact.png",
         "sensor-state-history.png",
     )
     for filename in screenshots:
@@ -171,6 +172,8 @@ def test_current_ui_screenshots_exist_and_are_linked():
         assert path.is_file() and path.stat().st_size > 3_000
         assert path.read_bytes().startswith(bytes((0x89, 0x50, 0x4E, 0x47)))
     assert "stop-options.png" not in readme
+    assert "current compact Options Flow" in readme
+    assert "stop-options-compact.png" in readme
     archive = (ROOT / "docs" / "legacy-ui-examples.md").read_text(
         encoding="utf-8"
     )
