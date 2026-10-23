@@ -72,6 +72,7 @@ class HSLHRTVehicleLocation(GeolocationEvent):
         self._hass_ref = hass
         self._key = key
         self._position = position
+        self._stop_code = entry.data.get("stop_code", "")
         self._retired = False
         signature = hashlib.sha256(
             (entry.entry_id + ":" + ":".join(key)).encode()
@@ -115,7 +116,7 @@ class HSLHRTVehicleLocation(GeolocationEvent):
         """Expose useful public journey details, but no API key."""
         return {
             ATTR_ATTRIBUTION: ATTRIBUTION,
-            "stop_code": self._position.get("stop_code"),
+            "stop_code": self._stop_code,
             "route": self._position.get("route"),
             "destination": self._position.get("destination"),
             "arrival_datetime": self._position.get("arrival_datetime"),
