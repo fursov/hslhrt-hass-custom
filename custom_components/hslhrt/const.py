@@ -111,6 +111,7 @@ query StopDepartures($id: String!) {
         route {
           gtfsId
           shortName
+          mode
         }
       }
     }

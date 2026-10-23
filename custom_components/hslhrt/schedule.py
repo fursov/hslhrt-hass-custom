@@ -80,7 +80,10 @@ def parse_departures(
             continue
 
         trip = item.get("trip") or {}
-        route = ((trip.get("route") or {}).get("shortName") or "").strip()
+        route_info = trip.get("route") or {}
+        route = (route_info.get("shortName") or "").strip()
+        mode = route_info.get("mode")
+        vehicle_mode = mode.upper() if isinstance(mode, str) and mode else None
         destination = (item.get("headsign") or "").strip()
         if not route:
             continue
@@ -142,6 +145,7 @@ def parse_departures(
 
         routes.append(
             {
+                "vehicle_mode": vehicle_mode,
                 "hfp_route_id": hfp_route,
                 "hfp_direction": hfp_direction,
                 "hfp_start": hfp_start,
