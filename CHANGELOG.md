@@ -5,6 +5,13 @@ are the custom-integration manifest versions, not Home Assistant Core versions.
 
 ## [0.8.0] — Unreleased
 
+- Improved the Options Flow with compact GPS lookahead and journeys-per-route
+  drop-downs, while preserving stored integer settings and existing entries.
+- Added complete Finnish (`fi`) translations for setup, stop selection,
+  reauthentication, preferences, errors and abort messages.
+- Updated README to describe the compact UI and archived the pre-release
+  radio-button screenshot.
+
 - Raised the declared minimum supported Home Assistant Core version in HACS
   from 2025.1.0 to 2026.10.2, matching the actual integration-test baseline.
   Earlier Home Assistant versions are no longer advertised as supported.

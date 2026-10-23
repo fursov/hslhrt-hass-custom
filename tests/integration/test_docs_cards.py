@@ -162,7 +162,6 @@ def test_current_ui_screenshots_exist_and_are_linked():
     screenshots = (
         "configure-stop.png",
         "select-stop.png",
-        "stop-options.png",
         "sensor-state-history.png",
     )
     for filename in screenshots:
@@ -171,5 +170,46 @@ def test_current_ui_screenshots_exist_and_are_linked():
         path = ROOT / relative_path
         assert path.is_file() and path.stat().st_size > 3_000
         assert path.read_bytes().startswith(bytes((0x89, 0x50, 0x4E, 0x47)))
+    assert "stop-options.png" not in readme
+    archive = (ROOT / "docs" / "legacy-ui-examples.md").read_text(
+        encoding="utf-8"
+    )
+    assert "stop-options.png" in archive
+    assert (ROOT / "resources/images/stop-options.png").is_file()
     assert "API key intentionally left blank" in readme
     assert "not a timetable card" in readme.lower()
+
+
+
+@pytest.mark.asyncio
+async def test_finnish_flow_translations_load_in_real_home_assistant(hass):
+    """Finnish labels, errors and messages work through HA's backend API."""
+    from homeassistant.helpers.translation import async_get_translations
+
+    for section, expected in {
+        "config": {
+            "component.hslhrt.config.step.user.data.user_name_code":
+                "Pysäkin nimi tai tunnus",
+            "component.hslhrt.config.step.select_stop.data.selected_stop":
+                "Pysäkki",
+            "component.hslhrt.config.error.invalid_api_key":
+                "Virheellinen Digitransitin API-avain",
+            "component.hslhrt.config.abort.already_configured":
+                "Pysäkki ja linja on jo määritetty",
+        },
+        "options": {
+            "component.hslhrt.options.step.init.title":
+                "Pysäkin asetukset",
+            "component.hslhrt.options.step.init.data.routes_filter":
+                "Linjat (tyhjä = kaikki)",
+            "component.hslhrt.options.step.init.data.tracking_horizon_minutes":
+                "GPS-seurannan aikajänne (minuuttia)",
+            "component.hslhrt.options.step.init.data.tracking_per_route":
+                "Seurattavien vuorojen määrä linjaa kohti",
+            "component.hslhrt.options.error.invalid_selection":
+                "Valitse jokin luettelon arvoista",
+        },
+    }.items():
+        translated = await async_get_translations(hass, "fi", section, {"hslhrt"})
+        for key, label in expected.items():
+            assert translated.get(key) == label, key

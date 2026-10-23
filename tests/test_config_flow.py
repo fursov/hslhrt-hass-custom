@@ -85,6 +85,7 @@ def flow_module(monkeypatch):
         def __init__(self, **kwargs):
             self.options = kwargs["options"]
             self.multiple = kwargs.get("multiple", False)
+            self.mode = kwargs.get("mode")
 
     class SelectOptionDict(dict):
         def __init__(self, *, value, label):
@@ -350,3 +351,73 @@ def test_name_search_still_disambiguates_both_eestinmalmintie_platforms(
     chosen = asyncio.run(flow.async_step_select_stop({"selected_stop": "HSL:4"}))
     assert chosen["type"] == "create_entry"
     assert chosen["data"]["stop_code"] == "E4972"
+
+
+
+def test_compact_hfp_options_preserve_integer_storage(flow_module):
+    """A dropdown emits strings; stored HFP settings remain integers."""
+    entry = SimpleNamespace(
+        data={"stop_gtfs": "HSL:1", "route": "8", "destination": "ALL",
+              "api_key": "SECRET"},
+        options={
+            "track_vehicles": True,
+            "tracking_horizon_minutes": 45,
+            "tracking_per_route": 3,
+        },
+        unique_id="HSL:1 8",
+    )
+    flow = flow_module.HSLHRTOptionsFlow()
+    flow.config_entry = entry
+    flow.hass = SimpleNamespace()
+    first = asyncio.run(flow.async_step_init())
+    fields = {key.schema: (key.default(), value)
+              for key, value in first["data_schema"].schema.items()}
+    for name, value, choices in (
+        ("tracking_horizon_minutes", "45", ["15", "30", "45", "60", "90"]),
+        ("tracking_per_route", "3", ["1", "2", "3", "4", "5"]),
+    ):
+        default, selector = fields[name]
+        assert default == value
+        assert selector.conf.mode == "dropdown"
+        assert selector.conf.options == choices
+
+    result = asyncio.run(flow.async_step_init({
+        "routes_filter": ["8"],
+        "destination_filter": "ALL",
+        "scan_interval": 5,
+        "track_vehicles": True,
+        "tracking_horizon_minutes": "60",
+        "tracking_per_route": "4",
+    }))
+    assert result["type"] == "create_entry"
+    assert result["data"]["tracking_horizon_minutes"] == 60
+    assert result["data"]["tracking_per_route"] == 4
+    assert type(result["data"]["tracking_horizon_minutes"]) is int
+    assert type(result["data"]["tracking_per_route"]) is int
+    assert result["data"]["track_vehicles"] is True
+    assert entry.unique_id == "HSL:1 8"
+
+
+def test_hfp_options_reject_invalid_dropdown_values(flow_module):
+    """Unknown dropdown choices must never become MQTT configuration."""
+    entry = SimpleNamespace(
+        data={"stop_gtfs": "HSL:1", "route": "ALL", "destination": "ALL",
+              "api_key": "SECRET"},
+        options={},
+    )
+    flow = flow_module.HSLHRTOptionsFlow()
+    flow.config_entry = entry
+    flow.hass = SimpleNamespace()
+    asyncio.run(flow.async_step_init())
+    result = asyncio.run(flow.async_step_init({
+        "routes_filter": [],
+        "destination_filter": "ALL",
+        "scan_interval": 1,
+        "tracking_horizon_minutes": "999",
+        "tracking_per_route": "0",
+    }))
+    assert result["type"] == "form"
+    assert result["errors"] == {
+        "tracking_horizon_minutes": "invalid_selection",
+        "tracking_per_route": "invalid_selection",
+    }

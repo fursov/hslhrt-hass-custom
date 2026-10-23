@@ -48,15 +48,17 @@ Under **Configure**, select one or more routes and a destination filter
 destination. The Routing API polling interval can be set to 1, 2, 3, 5, 10,
 15 or 30 minutes. Existing entries keep their original filters until changed.
 
-<details>
-<summary>Show current Options Flow screenshot (routes, polling and HFP)</summary>
+For compact setup, the GPS tracking lookahead (15–90 minutes) and number of
+journeys per route (1–5) are **drop-down selectors**, rather than long radio
+lists. Tracking is optional and is disabled by default. The earlier Options
+Flow screenshot is preserved in the historical UI archive; it shows the old
+radio-button layout, not the current release.
 
-![HSL HRT stop preferences — route selection, polling and HFP tracking](resources/images/stop-options.png)
-
-The form can be scrolled to reach all HFP lookahead and per-route choices.
-GPS tracking is optional and starts disabled.
-
-</details>
+**Languages:** The setup and options dialogs are available in English and
+Finnish (*suomi*). Select Finnish in your Home Assistant user profile's
+**Language** setting. Your existing stop IDs, entity IDs, and API filters
+remain unchanged when you switch languages. Restart Home Assistant and
+refresh the browser after updating the integration if translations are cached.
 
 ## Sensors
 

@@ -50,6 +50,24 @@ def _normalized(value: str) -> str:
     return value.strip() or ALL
 
 
+HFP_HORIZON_CHOICES = (15, 30, 45, 60, 90)
+HFP_PER_ROUTE_CHOICES = (1, 2, 3, 4, 5)
+
+
+def _dropdown_for_int_choices(values: tuple[int, ...]) -> SelectSelector:
+    """Render small integer option sets as compact drop-downs.
+
+    SelectSelector sends strings through the frontend; conversion back to
+    integers happens only when saving the options entry.
+    """
+    return SelectSelector(
+        SelectSelectorConfig(
+            options=[str(value) for value in values],
+            mode=SelectSelectorMode.DROPDOWN,
+        )
+    )
+
+
 def _stop_title(stop: dict) -> str:
     """Keep public stop code and GTFS ID visible for duplicate stop names."""
     return (
@@ -402,7 +420,17 @@ class HSLHRTOptionsFlow(config_entries.OptionsFlow):
                 for route in selected
             ):
                 errors[CONF_ROUTES] = "invalid_route"
-            else:
+            horizon = str(
+                user_input.get(CONF_HFP_HORIZON, DEFAULT_HFP_HORIZON)
+            )
+            per_route = str(
+                user_input.get(CONF_HFP_PER_ROUTE, DEFAULT_HFP_PER_ROUTE)
+            )
+            if horizon not in {str(value) for value in HFP_HORIZON_CHOICES}:
+                errors[CONF_HFP_HORIZON] = "invalid_selection"
+            if per_route not in {str(value) for value in HFP_PER_ROUTE_CHOICES}:
+                errors[CONF_HFP_PER_ROUTE] = "invalid_selection"
+            if not errors:
                 destination = _normalized(
                     user_input.get(CONF_DESTINATION_FILTER, ALL)
                 )
@@ -414,12 +442,9 @@ class HSLHRTOptionsFlow(config_entries.OptionsFlow):
                         CONF_DESTINATION_FILTER: destination,
                         CONF_SCAN_INTERVAL: interval,
                         CONF_HFP_ENABLED: user_input.get(CONF_HFP_ENABLED, False),
-                        CONF_HFP_HORIZON: user_input.get(
-                            CONF_HFP_HORIZON, DEFAULT_HFP_HORIZON
-                        ),
-                        CONF_HFP_PER_ROUTE: user_input.get(
-                            CONF_HFP_PER_ROUTE, DEFAULT_HFP_PER_ROUTE
-                        ),
+                        # Preserve the existing integer settings contract.
+                        CONF_HFP_HORIZON: int(horizon),
+                        CONF_HFP_PER_ROUTE: int(per_route),
                     },
                 )
 
@@ -461,16 +486,20 @@ class HSLHRTOptionsFlow(config_entries.OptionsFlow):
                 ): bool,
                 vol.Required(
                     CONF_HFP_HORIZON,
-                    default=entry.options.get(
-                        CONF_HFP_HORIZON, DEFAULT_HFP_HORIZON
+                    default=str(
+                        user_input.get(CONF_HFP_HORIZON, DEFAULT_HFP_HORIZON)
+                        if user_input is not None
+                        else entry.options.get(CONF_HFP_HORIZON, DEFAULT_HFP_HORIZON)
                     ),
-                ): vol.In([15, 30, 45, 60, 90]),
+                ): _dropdown_for_int_choices(HFP_HORIZON_CHOICES),
                 vol.Required(
                     CONF_HFP_PER_ROUTE,
-                    default=entry.options.get(
-                        CONF_HFP_PER_ROUTE, DEFAULT_HFP_PER_ROUTE
+                    default=str(
+                        user_input.get(CONF_HFP_PER_ROUTE, DEFAULT_HFP_PER_ROUTE)
+                        if user_input is not None
+                        else entry.options.get(CONF_HFP_PER_ROUTE, DEFAULT_HFP_PER_ROUTE)
                     ),
-                ): vol.In([1, 2, 3, 4, 5]),
+                ): _dropdown_for_int_choices(HFP_PER_ROUTE_CHOICES),
             }
         )
         return self.async_show_form(
