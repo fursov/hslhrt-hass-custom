@@ -1,11 +1,17 @@
 """Home Assistant end-to-end config-entry and entity registry tests."""
 
+import time
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock
 
 import pytest
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import async_fire_time_changed
+
+from custom_components.hslhrt.schedule import parse_departures
 
 from custom_components.hslhrt.const import COORDINATOR, DOMAIN
 
@@ -87,3 +93,67 @@ async def test_missing_key_starts_reauthentication(
     ) or entry.state is ConfigEntryState.MIGRATION_ERROR or (
         entry.state is ConfigEntryState.LOADED
     ) is False
+
+
+
+@pytest.mark.asyncio
+async def test_minute_tick_updates_eta_and_next_route_without_extra_api_calls(
+    hass, make_entry, mock_digitransit, stop_response
+):
+    """Cross a departure boundary locally without invoking Digitransit again."""
+    client, _flow = mock_digitransit
+    entry = make_entry(route="ALL", options={"scan_interval": 30})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    rows = {
+        row.unique_id: row.entity_id
+        for row in er.async_entries_for_config_entry(registry, entry.entry_id)
+    }
+    route_id = rows["HSL:1000 ALL"]
+    arrival_id = rows["HSL:1000 ALL_next_arrival"]
+    eta_id = rows["HSL:1000 ALL_minutes_until_arrival"]
+    assert hass.states.get(route_id).state == "8"
+    assert client.get_departures.await_count == 1
+
+    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    old = coordinator.data["routes"][0]
+    old["arrival_timestamp"] = time.time() - 15
+    new = parse_departures(stop_response(route="2"))["routes"][0]
+    coordinator.data["routes"].append(new)
+    assert hass.states.get(route_id).state == "8"  # no coordinator push
+    previous_arrival = hass.states.get(arrival_id).state
+
+    # Time event fires the sensor-only timer, not the coordinator/API.
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=2))
+    await hass.async_block_till_done()
+
+    assert hass.states.get(route_id).state == "2"
+    assert hass.states.get(arrival_id).state == datetime.fromtimestamp(
+        new["arrival_timestamp"], tz=timezone.utc
+    ).isoformat()
+    assert hass.states.get(arrival_id).state != previous_arrival
+    assert hass.states.get(route_id).attributes["departures"][0]["route"] == "2"
+    eta = int(hass.states.get(eta_id).state)
+    assert 1 <= eta <= 11
+    assert client.get_departures.await_count == 1
+
+    # Expire the last known arrival: all three timetable entities become unknown.
+    new["arrival_timestamp"] = time.time() - 1
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=4))
+    await hass.async_block_till_done()
+    assert hass.states.get(route_id).state == "unknown"
+    assert hass.states.get(arrival_id).state == "unknown"
+    assert hass.states.get(eta_id).state == "unknown"
+    assert hass.states.get(route_id).attributes["departures"] == []
+    assert client.get_departures.await_count == 1
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=6))
+    await hass.async_block_till_done()
+    assert hass.states.get(route_id) is None
+    assert hass.states.get(arrival_id) is None
+    assert hass.states.get(eta_id) is None
