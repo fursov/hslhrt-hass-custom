@@ -8,7 +8,11 @@ import pytest
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.hslhrt.const import DOMAIN, HFP_MANAGER
-from custom_components.hslhrt.geo_location import active_positions, journey_key
+from custom_components.hslhrt.geo_location import (
+    active_positions,
+    journey_key,
+    stop_coordinates,
+)
 
 
 def _trip_response(stop_response):
@@ -73,14 +77,26 @@ async def test_map_markers_follow_multiple_journeys_and_expire(
         manager = hass.data[DOMAIN][entry.entry_id][HFP_MANAGER]
         keys = list(manager._targets)
         assert len(keys) == 2
-        assert hass.states.async_all("geo_location") == []
+        stops = [
+            state for state in hass.states.async_all("geo_location")
+            if state.attributes["source"] == "hslhrt_stops"
+        ]
+        assert len(stops) == 1
+        assert stops[0].attributes["stop_code"] == "E4971"
+        assert (stops[0].attributes["latitude"], stops[0].attributes["longitude"]) == (
+            60.205, 24.9
+        )
+        assert stops[0].attributes["icon"] == "mdi:circle-small"
 
         manager._accept_position(keys[0], _position(60.1, 24.8))
         manager._accept_position(keys[1], _position(60.2, 24.9))
         manager._notify(force=True)
         await hass.async_block_till_done()
 
-        markers = hass.states.async_all("geo_location")
+        markers = [
+            state for state in hass.states.async_all("geo_location")
+            if state.attributes["source"] == "hslhrt"
+        ]
         assert len(markers) == 2
         ids = {state.entity_id for state in markers}
         assert len(ids) == 2
@@ -106,7 +122,10 @@ async def test_map_markers_follow_multiple_journeys_and_expire(
         manager._accept_position(keys[0], _position(60.3, 25.0))
         manager._notify(force=True)
         await hass.async_block_till_done()
-        updated = hass.states.async_all("geo_location")
+        updated = [
+            state for state in hass.states.async_all("geo_location")
+            if state.attributes["source"] == "hslhrt"
+        ]
         assert {state.entity_id for state in updated} == ids
         assert any(state.attributes["latitude"] == 60.3 for state in updated)
 
@@ -114,20 +133,29 @@ async def test_map_markers_follow_multiple_journeys_and_expire(
         manager._positions[keys[0]]["position_timestamp"] = time.time() - 120
         manager._notify(force=True)
         await hass.async_block_till_done()
-        remaining = hass.states.async_all("geo_location")
+        remaining = [
+            state for state in hass.states.async_all("geo_location")
+            if state.attributes["source"] == "hslhrt"
+        ]
         assert len(remaining) == 1
         assert remaining[0].attributes["route"] == "2"
 
         manager._positions[keys[1]]["position_timestamp"] = time.time() - 120
         manager._notify(force=True)
         await hass.async_block_till_done()
-        assert hass.states.async_all("geo_location") == []
+        assert {
+            state.attributes["source"] for state in
+            hass.states.async_all("geo_location")
+        } == {"hslhrt_stops"}
 
         # A fresh position restores the vehicle without creating a permanent ID.
         manager._accept_position(keys[0], _position(60.4, 25.1))
         manager._notify(force=True)
         await hass.async_block_till_done()
-        assert len(hass.states.async_all("geo_location")) == 1
+        assert len([
+            state for state in hass.states.async_all("geo_location")
+            if state.attributes["source"] == "hslhrt"
+        ]) == 1
 
         assert await hass.config_entries.async_unload(entry.entry_id)
         await hass.async_block_till_done()
@@ -135,13 +163,23 @@ async def test_map_markers_follow_multiple_journeys_and_expire(
 
 
 @pytest.mark.asyncio
-async def test_no_geolocation_entities_when_gps_disabled(
+async def test_configured_stop_stays_visible_when_gps_disabled(
     hass, make_entry, mock_digitransit
 ):
-    """Legacy installations have no MQTT manager or map markers."""
+    """Configured stops show on the stop layer, even with no MQTT tracking."""
     entry = make_entry()
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    markers = hass.states.async_all("geo_location")
+    assert len(markers) == 1
+    assert markers[0].attributes["source"] == "hslhrt_stops"
+    assert markers[0].attributes["stop_gtfs"] == "HSL:1000"
+    assert markers[0].attributes["stop_name"] == "Example"
+    assert markers[0].attributes["stop_code"] == "E4971"
+    registry = er.async_get(hass)
+    assert len(er.async_entries_for_config_entry(registry, entry.entry_id)) == 3
+    assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     assert hass.states.async_all("geo_location") == []
 
@@ -165,3 +203,79 @@ def test_only_fresh_valid_exact_journeys_are_map_eligible():
     selected = active_positions([*bad, good])
     assert len(selected) == 1
     assert next(iter(selected.values())) == good
+
+
+
+@pytest.mark.asyncio
+async def test_stop_marker_follows_coordinator_location_and_missing_coordinates(
+    hass, make_entry, mock_digitransit, stop_response
+):
+    """Configured stop positions are not guessed or kept after invalid updates."""
+    api, _flow = mock_digitransit
+    entry = make_entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    first = hass.states.async_all("geo_location")
+    assert len(first) == 1
+    stable_id = first[0].entity_id
+    updated = stop_response()
+    updated.update(lat=60.25, lon=24.85)
+    api.get_departures = AsyncMock(return_value=updated)
+    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    await coordinator.async_request_refresh()
+    await hass.async_block_till_done()
+    moved = hass.states.get(stable_id)
+    assert moved is not None
+    assert moved.attributes["latitude"] == 60.25
+    assert moved.attributes["longitude"] == 24.85
+
+    invalid = stop_response()
+    invalid.update(lat=None, lon=24.85)
+    api.get_departures = AsyncMock(return_value=invalid)
+    await coordinator.async_request_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.async_all("geo_location") == []
+
+    api.get_departures = AsyncMock(return_value=stop_response())
+    await coordinator.async_request_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(stable_id) is not None
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.async_all("geo_location") == []
+
+
+@pytest.mark.asyncio
+async def test_invalid_stop_coords_do_not_publish_false_marker(
+    hass, make_entry, mock_digitransit, stop_response
+):
+    api, _flow = mock_digitransit
+    response = stop_response()
+    response.update(lat=999, lon=24.9)
+    api.get_departures = AsyncMock(return_value=response)
+    entry = make_entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.async_all("geo_location") == []
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.parametrize("latitude,longitude", [
+    (None, 24.9),
+    (60.1, float("nan")),
+    (60.1, 181),
+    (True, 24.9),
+    ("60.1", 24.9),
+])
+def test_invalid_stop_position_is_omitted(latitude, longitude):
+    assert stop_coordinates({"stop_latitude": latitude, "stop_longitude": longitude}) is None
+
+
+def test_valid_stop_position():
+    assert stop_coordinates({"stop_latitude": 60.21, "stop_longitude": 24.86}) == (
+        60.21, 24.86
+    )

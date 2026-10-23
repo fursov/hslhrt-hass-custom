@@ -3,7 +3,20 @@
 All notable changes to this HSL HRT integration are recorded here. Versions
 are the custom-integration manifest versions, not Home Assistant Core versions.
 
-## [0.8.1] — Unreleased
+## [0.9.0] — Unreleased
+
+- Added configured-stop map markers through the separate `hslhrt_stops`
+  geolocation source, with `mdi:circle-small` icons and stop name/code details.
+- Digitransit stop `lat`/`lon` are retrieved in the existing Routing v2
+  departure query; no additional requests or subscription/API-key changes.
+- Show stops independently of HFP availability, refresh their coordinates on
+  successful coordinator updates, and remove them on unload or invalid data.
+- Map Card examples now combine `hslhrt` vehicles (route/emoji labels) and
+  `hslhrt_stops` stops (circle icons) with separate source display modes.
+- Added real Home Assistant tests for GPS-disabled stops, map coexistence,
+  invalid coordinates, coordinate changes, unload and document configuration.
+
+## [0.8.1] — 2026-10-23
 
 - Fixed MQTT subscription updates by scheduling and awaiting the executor
   Future correctly; serialized updates across rapid timetable changes.

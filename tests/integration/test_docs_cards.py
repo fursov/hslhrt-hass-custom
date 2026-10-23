@@ -48,11 +48,17 @@ def test_all_readme_yaml_cards_parse_and_use_real_ha_schemas():
                 assert row["entity"].startswith(ENTITY)
     for card in cards:
         if card["type"] == "map":
-            assert card["geo_location_sources"] == [{
-                "source": "hslhrt",
-                "label_mode": "attribute",
-                "attribute": "marker_label",
-            }]
+            assert card["geo_location_sources"] == [
+                {
+                    "source": "hslhrt",
+                    "label_mode": "attribute",
+                    "attribute": "marker_label",
+                },
+                {
+                    "source": "hslhrt_stops",
+                    "label_mode": "icon",
+                },
+            ]
             assert card["auto_fit"] is True
 
 

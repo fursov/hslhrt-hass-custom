@@ -155,3 +155,13 @@ def test_route_mode_from_routing_api_does_not_change_timetable_filtering():
     assert parsed["routes"][0]["vehicle_mode"] == "SUBWAY"
     row["trip"]["route"]["mode"] = None
     assert schedule.parse_departures(make_stop([row]))["routes"][0]["vehicle_mode"] is None
+
+
+
+def test_stop_coordinates_survive_empty_departure_list():
+    stop = make_stop([])
+    stop.update(lat=60.205, lon=24.9)
+    parsed = schedule.parse_departures(stop)
+    assert parsed["stop_latitude"] == 60.205
+    assert parsed["stop_longitude"] == 24.9
+    assert parsed["routes"] == []
