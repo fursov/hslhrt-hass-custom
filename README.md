@@ -78,7 +78,7 @@ The legacy `ROUTES` attribute excludes the first arrival and is capped at
 ![Home Assistant route sensor history — values 158 and 530 over time](resources/images/sensor-state-history.png)
 
 This is the built-in **History / Activity** view of the route sensor, showing
-how the *next route number* changes. It is **not** a timetable card and does
+how the *next route number* changes. It is **not a timetable card** and does
 not show every upcoming departure; use the `departures` attribute or the
 dashboard examples below for a timetable.
 
