@@ -125,3 +125,23 @@ def parse_departures(
         STOP_GTFS: stop.get("gtfsId") or "",
         DICT_KEY_ROUTES: routes,
     }
+
+
+def upcoming_departures(data: dict | None, now_timestamp: float) -> list[dict]:
+    """Return only upcoming journeys, ordered by their actual arrival time.
+
+    The service may return a departure whose real-time prediction has
+    already expired. Do not show it as the *next* bus until the next poll.
+    This function does not mutate coordinator data.
+    """
+    departures = (data or {}).get(DICT_KEY_ROUTES) or []
+    return sorted(
+        (
+            item
+            for item in departures
+            if isinstance(item, dict)
+            and isinstance(item.get("arrival_timestamp"), (int, float))
+            and item["arrival_timestamp"] >= now_timestamp
+        ),
+        key=lambda item: item["arrival_timestamp"],
+    )

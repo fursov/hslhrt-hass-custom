@@ -17,6 +17,9 @@ CONF_API_KEY = "api_key"
 API_KEY_HEADER = "digitransit-subscription-key"
 REQUEST_TIMEOUT = 10
 DEPARTURE_LIMIT = 100
+# Keep entity attributes small to avoid bloating Recorder storage.
+MAX_LEGACY_ROUTES = 20
+MAX_DEPARTURES_ATTRIBUTE = 10
 
 NAME_CODE = "user_name_code"
 STOP_CODE = "stop_code"
