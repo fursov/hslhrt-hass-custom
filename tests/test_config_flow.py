@@ -189,7 +189,10 @@ def test_exact_public_stop_code_skips_picker(flow_module, monkeypatch):
     module = flow_module
     class CodeClient(module.DigitransitClient):
         async def search_stops(self, name):
-            return STOPS
+            raise AssertionError("Stop codes must not use the name query")
+
+        async def search_stop_by_code(self, code):
+            return {"gtfsId": "HSL:2", "code": "H0210"}
     monkeypatch.setattr(module, "DigitransitClient", CodeClient)
     flow = new_flow(module)
     result = asyncio.run(flow.async_step_user(user_input("H0210", "8")))
