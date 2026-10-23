@@ -74,6 +74,35 @@ Some timetable journeys lack the GTFS metadata required for exact matching;
 they remain in the original timetable but are omitted from HFP selection.
 GPS points on the native Home Assistant map are planned for PR9.
 
+## Live vehicle map (v0.8.0)
+
+With HFP tracking enabled on a configured stop, the integration now publishes
+**temporary** `geo_location` entities for selected upcoming journeys that
+currently have fresh HFP GPS coordinates. No marker is shown when the vehicle
+is not known or its last position is older than 90 seconds.
+
+Add a built-in **Map** card and select **HSL HRT** (`hslhrt`) under
+**Geolocation sources**. YAML equivalent:
+
+```yaml
+type: map
+geo_location_sources:
+  - hslhrt
+auto_fit: true
+```
+
+The map contains **all tracking-enabled configured stops**. Each vehicle
+marker shows its public route and destination. Its attributes include the stop
+code, scheduled arrival, vehicle/operator identifiers, position timestamp,
+heading and speed where available. The source is `hslhrt`.
+
+Markers **update in place** as new coordinates arrive and are completely
+removed when their journey leaves the selected horizon, the GPS becomes stale,
+the configuration unloads or GPS tracking is switched off. These temporary
+entities deliberately have no permanent registry entries and cannot be pinned
+individually before a vehicle has been observed. The existing route and ETA
+sensors continue to function independently from HFP.
+
 ## Development and tests
 
 Run the lightweight unit tests in a Python 3.13 environment:

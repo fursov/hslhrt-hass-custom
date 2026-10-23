@@ -3,7 +3,20 @@
 All notable changes to this HSL HRT integration are recorded here. Versions
 are the custom-integration manifest versions, not Home Assistant Core versions.
 
-## [0.7.0] — Unreleased
+## [0.8.0] — Unreleased
+
+- Added native Map Card integration via temporary `geo_location` entities,
+  one for each selected journey with fresh HFP GPS coordinates.
+- Markers are updated in place and removed after GPS expires, when the
+  scheduled journey is no longer selected, on unload, or when HFP is disabled.
+- Stable `hslhrt` geolocation source for Map Card and automations, with
+  route, destination, stop code, arrival and vehicle metadata.
+- No persistent entity-registry entries; existing sensors and unique IDs are
+  unchanged.
+- Added real Home Assistant tests for multiple simultaneous vehicles,
+  relocation, expiry, reappearance, unload and disabled tracking.
+
+## [0.7.0]
 
 - Optional HFP v2 MQTT tracking for multiple upcoming journeys of every
   selected public route at a configured stop.
