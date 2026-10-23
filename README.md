@@ -29,7 +29,7 @@ insert stub `homeassistant` modules into `sys.modules`, whereas integration
 tests import real Home Assistant libraries. CI enforces both suites separately.
 
 The integration job uses a pinned HA version and pinned test-fixture plugin,
-and runs on every PR, push to `main`, and weekly. It detects problems such as
+and runs on every PR and push to `main`. Weekly scheduled runs additionally\nupgrade Home Assistant and the testing plugin to detect upstream breakages. It detects problems such as
 obsolete Home Assistant imports that simple syntax and mocked tests miss.
 
 This PR changes no runtime integration code or manifest version.

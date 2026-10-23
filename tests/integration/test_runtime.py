@@ -87,3 +87,35 @@ async def test_missing_key_starts_reauthentication(
     ) or entry.state is ConfigEntryState.MIGRATION_ERROR or (
         entry.state is ConfigEntryState.LOADED
     ) is False
+
+
+@pytest.mark.asyncio
+async def test_transient_api_failure_recovers_real_sensor(
+    hass, make_entry, mock_digitransit, stop_response
+):
+    """DataUpdateCoordinator must mark entities unavailable and recover."""
+    from custom_components.hslhrt.client import DigitransitError
+
+    setup_client, _ = mock_digitransit
+    entry = make_entry(route="ALL")
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    registry = er.async_get(hass)
+    row = next(
+        ent for ent in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if ent.unique_id == "HSL:1000 ALL"
+    )
+    assert hass.states.get(row.entity_id).state == "8"
+
+    setup_client.get_departures.side_effect = DigitransitError("test outage")
+    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    await coordinator.async_request_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(row.entity_id).state == "unavailable"
+
+    setup_client.get_departures.side_effect = None
+    setup_client.get_departures.return_value = stop_response()
+    await coordinator.async_request_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(row.entity_id).state == "8"
