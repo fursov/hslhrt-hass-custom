@@ -115,8 +115,11 @@ class DigitransitClient:
             gid = props.get("gid")
             gid = gid if isinstance(gid, str) else ""
             suffix = gid.rpartition("#")[2].upper() if "#" in gid else ""
-            public_code = props.get("code") or props.get("shortName") or suffix
-            if not isinstance(public_code, str) or public_code.upper() != normalized:
+            possible_codes = (props.get("code"), props.get("shortName"), suffix)
+            if not any(
+                isinstance(value, str) and value.strip().upper() == normalized
+                for value in possible_codes
+            ):
                 continue
 
             gtfs_id = props.get("gtfsId")
