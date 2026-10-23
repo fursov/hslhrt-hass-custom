@@ -25,10 +25,10 @@ def test_existing_destination_preserved_and_override_can_select_all():
     data = {"route": "ALL", "destination": "Kamppi"}
     assert config.effective_filters(data, {}) == ("ALL", "Kamppi", None)
     choices = {"routes_filter": [], "destination_filter": "Kamppi"}
-    assert config.effective_filters(data, choices) == ("ALL", "Kamppi", [])
+    assert config.effective_filters(data, choices) == ("all", "Kamppi", [])
     assert config.effective_filters(
         data, {"routes_filter": [], "destination_filter": "ALL"}
-    ) == ("ALL", "ALL", [])
+    ) == ("all", "ALL", [])
 
 
 def test_multiple_routes_options_and_poll_interval():
@@ -39,7 +39,7 @@ def test_multiple_routes_options_and_poll_interval():
         "scan_interval": 5,
     }
     assert config.default_selected_routes(data, opts) == ["2", "8"]
-    assert config.effective_filters(data, opts) == ("ALL", "Espoo", ["2", "8"])
+    assert config.effective_filters(data, opts) == ("all", "Espoo", ["2", "8"])
     assert config.scan_interval_minutes(opts) == 5
 
 

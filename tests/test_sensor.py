@@ -73,6 +73,7 @@ def config_entry():
     return SimpleNamespace(
         entry_id="entry1",
         unique_id="HSL:1000 8",
+        options={},
         data={"stop_gtfs": "HSL:1000", "stop_name": "Töölöntori",
               "stop_code": "H1000", "route": "8", "destination": "ALL"},
     )
@@ -177,3 +178,13 @@ def test_eta_rounds_up_exact_and_partial_minutes(sensors):
     assert eta.native_value == 2
     co.data["routes"] = [trip(NOW + 120.01)]
     assert eta.native_value == 3
+
+
+def test_options_change_name_without_changing_entity_identity(sensors):
+    entry = config_entry()
+    entry.options = {"routes_filter": ["2", "8"], "destination_filter": "ALL"}
+    entity = sensors.HSLHRTRouteSensor(
+        coordinator([trip(NOW + 100)]), entry
+    )
+    assert entity._attr_unique_id == "HSL:1000 8"
+    assert entity._attr_name == "Töölöntori(H1000) 2, 8"
