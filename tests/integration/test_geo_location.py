@@ -23,7 +23,11 @@ def _trip_response(stop_response):
                 "serviceDay": day,
                 "scheduledDeparture": stop_time["scheduledArrival"] - 120,
             },
-            "route": {"gtfsId": f"HSL:100{line}", "shortName": line},
+            "route": {
+                "gtfsId": f"HSL:100{line}",
+                "shortName": line,
+                "mode": "BUS" if idx == 0 else "TRAM",
+            },
         }
     return stop
 
@@ -81,6 +85,13 @@ async def test_map_markers_follow_multiple_journeys_and_expire(
         ids = {state.entity_id for state in markers}
         assert len(ids) == 2
         assert {state.attributes["route"] for state in markers} == {"8", "2"}
+        by_route = {state.attributes["route"]: state for state in markers}
+        assert by_route["8"].attributes["vehicle_mode"] == "BUS"
+        assert by_route["8"].attributes["marker_label"] == "🚌 8"
+        assert by_route["8"].attributes["icon"] == "mdi:bus"
+        assert by_route["2"].attributes["vehicle_mode"] == "TRAM"
+        assert by_route["2"].attributes["marker_label"] == "🚋 2"
+        assert by_route["2"].attributes["icon"] == "mdi:tram"
         assert {state.attributes["source"] for state in markers} == {"hslhrt"}
         assert all(state.attributes["stop_code"] == "E4971" for state in markers)
 

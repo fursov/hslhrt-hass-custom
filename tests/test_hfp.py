@@ -158,3 +158,21 @@ def test_midnight_service_day_and_direction_in_schedule_parser():
     assert item["hfp_direction"] == "1"
     assert item["hfp_start"] == "00:45"
     assert item["hfp_operating_day"] == "2026-10-23"
+
+
+
+def test_mode_to_marker_label_and_icon_is_explicit():
+    vehicle = importlib.import_module("hslhrt.vehicle")
+    for mode, route, label, icon in [
+        ("BUS", "530", "🚌 530", "mdi:bus"),
+        ("TRAM", "7", "🚋 7", "mdi:tram"),
+        ("SUBWAY", "M1", "🚇 M1", "mdi:subway"),
+        ("RAIL", "I", "🚆 I", "mdi:train"),
+        ("FERRY", "19", "⛴ 19", "mdi:ferry"),
+        ("BUS", "2", "🚌 2", "mdi:bus"),
+        ("unknown", "530", "530", "mdi:map-marker"),
+        (None, "530", "530", "mdi:map-marker"),
+    ]:
+        assert vehicle.marker_label(route, mode) == label
+        assert vehicle.vehicle_icon(mode) == icon
+    assert vehicle.marker_label("", "BUS") == "?"

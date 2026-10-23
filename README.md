@@ -108,8 +108,8 @@ Once enabled, an additional **Tracked vehicles** sensor appears:
 - `selected_journeys`: number of eligible trips whose GTFS journey identity
   can be matched to HFP.
 - `vehicles`: bounded list of planned journeys and their GPS when available.
-  Each row includes route, arrival, direction, trip start, operating day and
-  `gps_available`. The `latitude`, `longitude`, speed and heading appear
+  Each row includes route, transport mode when available, arrival, direction,
+  trip start, operating day and `gps_available`. The `latitude`, `longitude`, speed and heading appear
   only when the HFP position is fresh.
 - `hfp_connected`: whether the public MQTT broker is currently connected.
 
@@ -138,14 +138,20 @@ Add a built-in **Map** card and select the `hslhrt` source under
 ```yaml
 type: map
 geo_location_sources:
-  - hslhrt
+  - source: hslhrt
+    label_mode: attribute
+    attribute: marker_label
 auto_fit: true
 ```
 
 The map contains **all tracking-enabled configured stops**. Each vehicle
-marker shows its public route and destination. Its attributes include the stop
-code, scheduled arrival, vehicle/operator identifiers, position timestamp,
-heading and speed where available. The source is `hslhrt`.
+marker label defaults to an emoji and public route number (for example
+`🚌 530`, `🚋 7`, `🚇 M1`, `🚆 I`, or `⛴ 19`), where Digitransit
+provides a recognized `vehicle_mode`. Unknown types display only the route
+number rather than a guessed vehicle type. The `marker_label` and
+`vehicle_mode` attributes are also available for automations. Other
+attributes include destination, stop code, arrival time, operator/vehicle,
+position timestamp, heading and speed. The source is `hslhrt`.
 
 Markers **update in place** as new coordinates arrive and are completely
 removed when their journey leaves the selected horizon, the GPS becomes stale,
@@ -314,9 +320,17 @@ source, including vehicles tracked by *other configured stops*.
 ```yaml
 type: map
 geo_location_sources:
-  - hslhrt
+  - source: hslhrt
+    label_mode: attribute
+    attribute: marker_label
 auto_fit: true
 ```
+
+To show **only the number**, change `attribute: marker_label` to
+`attribute: route` in the YAML. To show only the mode-dependent MDI icon,
+replace the `label_mode` and `attribute` lines with `label_mode: icon`.
+The built-in Map Card does not render separate icon-and-text controls in the
+same marker; `marker_label` is a simple combined text alternative.
 
 Markers are temporary; they disappear if GPS ages beyond 90 seconds or
 a journey is no longer selected. A blank map does not mean timetable sensors

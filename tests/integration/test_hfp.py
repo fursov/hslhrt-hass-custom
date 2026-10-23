@@ -66,3 +66,121 @@ async def test_opt_in_hfp_adds_one_real_sensor_without_network(
 
         assert await hass.config_entries.async_unload(entry.entry_id)
         await hass.async_block_till_done()
+
+
+
+@pytest.mark.asyncio
+async def test_mqtt_subscriptions_change_serialize_and_resubscribe_after_reconnect(
+    hass,
+):
+    """Use the real HA task/executor APIs, without connecting to MQTT."""
+    from custom_components.hslhrt.hfp import HFPManager, topic_for_trip
+    from types import SimpleNamespace
+
+    class FakeMQTT:
+        def __init__(self):
+            self.subscribe_calls = []
+            self.unsubscribe_calls = []
+
+        def subscribe(self, topic, qos=0):
+            self.subscribe_calls.append(topic)
+            return (0, len(self.subscribe_calls))
+
+        def unsubscribe(self, topic):
+            self.unsubscribe_calls.append(topic)
+            return (0, len(self.unsubscribe_calls))
+
+        def disconnect(self):
+            return 0
+
+        def loop_stop(self):
+            pass
+
+    def departure(line: str, minutes: int):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        instant = time.time() + minutes * 60
+        helsinki = datetime.fromtimestamp(instant, ZoneInfo("Europe/Helsinki"))
+        return {
+            "route": line,
+            "arrival_timestamp": instant,
+            "hfp_route_id": f"{line}00",
+            "hfp_direction": "1",
+            "hfp_start": helsinki.strftime("%H:%M"),
+            "hfp_operating_day": helsinki.date().isoformat(),
+        }
+
+    first = departure("533", 10)
+    second = departure("236", 15)
+    third = departure("530", 12)
+    coordinator = SimpleNamespace(data={"routes": [first, second]})
+    manager = HFPManager(hass, coordinator, horizon=30, per_route=2)
+    broker = FakeMQTT()
+    manager._client = broker
+    manager._refresh_targets()
+    assert manager._subscribed_topics == frozenset()
+    # Initial TCP handshake; an executor Future is awaited by a real coroutine.
+    manager._set_connected(True)
+    await hass.async_block_till_done()
+    expected = set(manager._topics)
+    assert expected == set(broker.subscribe_calls)
+    assert manager._subscribed_topics == expected
+
+    coordinator.data = {"routes": [second, third]}
+    manager._refresh_targets()
+    await hass.async_block_till_done()
+    now = set(manager._topics)
+    assert manager._subscribed_topics == now
+    assert topic_for_trip(next(k for k in manager._targets if k[0] == "53300")) not in now if any(
+        k[0] == "53300" for k in manager._targets
+    ) else all("53300" not in topic for topic in now)
+    assert len(broker.unsubscribe_calls) == 1
+    assert len(broker.subscribe_calls) == 3
+
+    manager._set_connected(False)
+    assert manager._subscribed_topics == frozenset()
+    manager._set_connected(True)
+    await hass.async_block_till_done()
+    assert manager._subscribed_topics == now
+    assert len(broker.subscribe_calls) == 5
+
+    # Several coordinator refreshes before the scheduled coroutine runs:
+    # only the final set of topics should be reflected at the broker.
+    coordinator.data = {"routes": [first]}
+    manager._refresh_targets()
+    coordinator.data = {"routes": [second]}
+    manager._refresh_targets()
+    coordinator.data = {"routes": [first, third]}
+    manager._refresh_targets()
+    await hass.async_block_till_done()
+    assert manager._subscribed_topics == manager._topics
+    assert len(manager._subscribed_topics) == 2
+    await manager.async_stop()
+    assert manager._subscription_task is None
+
+
+@pytest.mark.asyncio
+async def test_rejected_mqtt_subscription_does_not_claim_success(hass):
+    from custom_components.hslhrt.hfp import HFPManager
+    from types import SimpleNamespace
+
+    class RejectBroker:
+        def subscribe(self, topic, qos=0):
+            return (128, 0)
+
+        def unsubscribe(self, topic):
+            return (0, 0)
+
+        def disconnect(self):
+            pass
+
+        def loop_stop(self):
+            pass
+
+    manager = HFPManager(hass, SimpleNamespace(), 30, 2)
+    manager._client = RejectBroker()
+    manager._topics = frozenset({"/hfp/test"})
+    manager._set_connected(True)
+    await hass.async_block_till_done()
+    assert not manager._subscribed_topics
+    await manager.async_stop()

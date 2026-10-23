@@ -3,7 +3,20 @@
 All notable changes to this HSL HRT integration are recorded here. Versions
 are the custom-integration manifest versions, not Home Assistant Core versions.
 
-## [0.8.0] — Unreleased
+## [0.8.1] — Unreleased
+
+- Fixed MQTT subscription updates by scheduling and awaiting the executor
+  Future correctly; serialized updates across rapid timetable changes.
+- Resubscribe to the desired HFP journeys after MQTT reconnection, track
+  acknowledged subscriptions and retry failed operations on timer refresh.
+- Expose Digitransit route transport mode in tracked-vehicle and geolocation
+  attributes, with mode-appropriate MDI icons and emoji-based `marker_label`.
+- Show `marker_label` on the native Map Card by default, with `route` as
+  a number-only alternative. No entity ID or config migration required.
+- Added real HA MQTT lifecycle tests for changing and reconnecting subscriptions,
+  plus mode-specific geolocation and map YAML regression checks.
+
+## [0.8.0] — 2026-10-23
 
 - Improved the Options Flow with compact GPS lookahead and journeys-per-route
   drop-downs, while preserving stored integer settings and existing entries.
