@@ -74,7 +74,7 @@ async def test_mqtt_subscriptions_change_serialize_and_resubscribe_after_reconne
     hass,
 ):
     """Use the real HA task/executor APIs, without connecting to MQTT."""
-    from custom_components.hslhrt.hfp import HFPManager, topic_for_trip
+    from custom_components.hslhrt.hfp import HFPManager
     from types import SimpleNamespace
 
     class FakeMQTT:
@@ -131,9 +131,7 @@ async def test_mqtt_subscriptions_change_serialize_and_resubscribe_after_reconne
     await hass.async_block_till_done()
     now = set(manager._topics)
     assert manager._subscribed_topics == now
-    assert topic_for_trip(next(k for k in manager._targets if k[0] == "53300")) not in now if any(
-        k[0] == "53300" for k in manager._targets
-    ) else all("53300" not in topic for topic in now)
+    assert all("53300" not in topic for topic in now)
     assert len(broker.unsubscribe_calls) == 1
     assert len(broker.subscribe_calls) == 3
 
