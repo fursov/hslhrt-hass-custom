@@ -27,8 +27,15 @@ Copy the files from `custom_components/hslhrt/` in this repository into your Hom
 - Uses HA's shared asynchronous HTTP session (no standalone GraphQL library).
 - The one-sensor-per-config-entry model and legacy `ROUTE`, `DESTINATION`, `ARRIVAL TIME`, `ROUTES` attributes remain supported.
 - Realtime arrival timestamps are computed from `serviceDay` and the appropriate arrival offset, so journeys across midnight and daylight-saving transitions are handled correctly.
-- Initial stop selection uses the first search result when no exact stop code/name matches; an improved interactive stop picker is planned for a later PR.
+- Stop name disambiguation is supported beginning with v0.6.0.
 - This version has not been live-tested against Digitransit with a personal API key; tests use fixture responses.
+
+## Configuration improvements (v0.6.0)
+
+- **Stop picker:** Searching by name now offers a dropdown of matching stop platforms, including the public code and GTFS ID, instead of silently taking the first result. Exact stop codes and GTFS IDs skip the picker. The picker shows at most the first 50 valid API results; narrow your search if necessary.
+- **Options:** Open **Settings → Devices & services → Helsinki Regional Transport → Configure** for a configured stop. Select any number of routes, optionally a destination, and a polling interval of 1, 2, 3, 5, 10, 15 or 30 minutes. Leave route selection empty to include all routes. A nonempty route selection takes precedence over the destination filter.
+- **Compatibility:** Existing entries without options keep their original single-route or destination filter and the 1-minute polling interval. Saving Options preserves the config entry and entity unique IDs; the display name may reflect the newly selected routes. Configured options trigger an automatic integration reload.
+- **Rate limits:** One Digitransit timetable query is made per configured stop/route entry at each poll. Reducing polling frequency reduces API requests but also makes arrival predictions and the minute ETA less current.
 
 ## Maintenance (v0.5.1)
 
