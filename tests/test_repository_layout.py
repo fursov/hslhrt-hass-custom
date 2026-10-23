@@ -23,6 +23,8 @@ def test_one_hacs_integration_in_standard_layout():
         "sensor.py",
         "manifest.json",
         "strings.json",
+        "client.py",
+        "schedule.py",
         "translations/en.json",
     ):
         assert (INTEGRATION / filename).is_file(), filename
@@ -38,12 +40,12 @@ def test_manifest_metadata_and_version():
         "name",
         *sorted(key for key in manifest if key not in ("domain", "name")),
     ]
-    assert manifest["version"] == "0.3.5"
+    assert manifest["version"] == "0.4.0"
     assert manifest["config_flow"] is True
     assert manifest["documentation"].startswith("https://github.com/fursov/")
     assert manifest["issue_tracker"].startswith("https://github.com/fursov/")
     assert manifest["codeowners"] == ["@fursov"]
-    assert manifest["requirements"] == ["python_graphql_client==0.4.3"]
+    assert manifest["requirements"] == []
 
 
 def test_hacs_metadata():
