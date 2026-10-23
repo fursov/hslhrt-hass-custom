@@ -79,3 +79,73 @@ def test_stop_query_uses_bounded_departures():
     stop = asyncio.run(client.get_departures("HSL:123"))
     assert stop["gtfsId"] == "HSL:123"
     assert "numberOfDepartures: 100" in session.calls[0][1]["json"]["query"]
+
+
+def test_exact_public_stop_code_uses_geocoding_with_subscription_key():
+    """The public code must match exactly, regardless of fuzzy search hits."""
+    features = [
+        {"properties": {
+            "layer": "stop", "gid": "gtfshsl:stop:GTFS:HSL:222#E4972",
+            "label": "Eestinmalmintie E4972",
+        }},
+        {"properties": {
+            "layer": "stop", "gid": "gtfshsl:stop:GTFS:HSL:111#E4971",
+            "label": "Eestinmalmintie E4971",
+        }},
+    ]
+
+    class GeocodingSession(Session):
+        def get(self, url, **kwargs):
+            self.calls.append((url, kwargs))
+            return self.response
+
+    session = GeocodingSession(Response(payload={"features": features}))
+    client = client_module.DigitransitClient(session, "SECRET")
+    stop = asyncio.run(client.search_stop_by_code("e4971"))
+    assert stop == {"gtfsId": "HSL:111", "code": "E4971"}
+    url, args = session.calls[0]
+    assert url == "https://api.digitransit.fi/geocoding/v1/search"
+    assert args["params"] == {"text": "E4971", "layers": "stop", "size": 20}
+    assert args["headers"] == {"digitransit-subscription-key": "SECRET"}
+
+
+def test_geocoding_does_not_fallback_to_inexact_stop_codes():
+    class GeocodingSession(Session):
+        def get(self, url, **kwargs):
+            return self.response
+
+    session = GeocodingSession(Response(payload={"features": [
+        {"properties": {
+            "layer": "stop", "code": "E4972",
+            "gid": "gtfshsl:stop:GTFS:HSL:222#E4972",
+        }},
+        {"properties": {"layer": "address", "code": "E4971",
+                         "gid": "not-a-transit-stop"}},
+    ]}))
+    client = client_module.DigitransitClient(session, "SECRET")
+    assert asyncio.run(client.search_stop_by_code("E4971")) is None
+
+
+@pytest.mark.parametrize("http_status", [401, 403, 429])
+def test_geocoding_errors_hide_subscription_key(http_status):
+    class GeocodingSession(Session):
+        def get(self, url, **kwargs):
+            return self.response
+
+    session = GeocodingSession(Response(status=http_status))
+    client = client_module.DigitransitClient(session, "SENSITIVE")
+    with pytest.raises(client_module.DigitransitError) as exc:
+        asyncio.run(client.search_stop_by_code("E4971"))
+    assert "SENSITIVE" not in str(exc.value)
+
+
+def test_geocoding_malformed_response_is_rejected():
+    class GeocodingSession(Session):
+        def get(self, url, **kwargs):
+            return self.response
+
+    client = client_module.DigitransitClient(
+        GeocodingSession(Response(payload={"data": []})), "KEY"
+    )
+    with pytest.raises(client_module.DigitransitError):
+        asyncio.run(client.search_stop_by_code("E4971"))

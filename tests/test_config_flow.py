@@ -126,8 +126,21 @@ def flow_module(monkeypatch):
         async def search_stops(self, name):
             return STOPS if name.lower() == "töölöntori" else []
 
+        async def search_stop_by_code(self, code):
+            results = {
+                "E4971": {"gtfsId": "HSL:3", "code": "E4971"},
+                "E4972": {"gtfsId": "HSL:4", "code": "E4972"},
+            }
+            return results.get(code.upper())
+
         async def get_stop_info(self, gtfs):
-            item = next((s for s in STOPS if s["gtfsId"] == gtfs), None)
+            code_stops = [
+                {"name": "Eestinmalmintie", "code": "E4971", "gtfsId": "HSL:3"},
+                {"name": "Eestinmalmintie", "code": "E4972", "gtfsId": "HSL:4"},
+            ]
+            item = next(
+                (s for s in STOPS + code_stops if s["gtfsId"] == gtfs), None
+            )
             if item is None:
                 return None
             return {**item, "patterns": [
@@ -265,3 +278,72 @@ def test_reauth_preserves_unique_id_and_options(flow_module):
     assert result["type"] == "update"
     assert result["data_updates"] == {"api_key": "NEW"}
     assert entry.options == {"routes_filter": ["8"], "scan_interval": 5}
+
+
+@pytest.mark.parametrize(
+    ("stop_code", "expected_gtfs"),
+    [("E4971", "HSL:3"), ("e4972", "HSL:4")],
+)
+def test_public_stop_code_resolves_without_name_search(
+    flow_module, monkeypatch, stop_code, expected_gtfs
+):
+    """Direct public code entry must resolve the specified side of the road."""
+    base_client = flow_module.DigitransitClient
+
+    class ExactCodeClient(base_client):
+        async def search_stops(self, name):
+            raise AssertionError("Public codes must not use name-based search")
+
+    monkeypatch.setattr(flow_module, "DigitransitClient", ExactCodeClient)
+    flow = new_flow(flow_module)
+    result = asyncio.run(flow.async_step_user(user_input(stop_code)))
+    assert result["type"] == "create_entry"
+    assert result["data"]["stop_gtfs"] == expected_gtfs
+    assert result["data"]["stop_code"] == stop_code.upper()
+    assert flow.unique_id == f"{expected_gtfs} ALL"
+
+
+def test_public_code_not_found_does_not_fall_back_to_other_stop(flow_module):
+    flow = new_flow(flow_module)
+    result = asyncio.run(flow.async_step_user(user_input("E4973")))
+    assert result["type"] == "form"
+    assert result["errors"]["user_name_code"] == "invalid_name_code"
+
+
+def test_public_stop_code_is_verified_against_routing_details(
+    flow_module, monkeypatch
+):
+    base_client = flow_module.DigitransitClient
+
+    class MismatchedClient(base_client):
+        async def search_stop_by_code(self, code):
+            return {"gtfsId": "HSL:4", "code": "E4971"}
+
+    monkeypatch.setattr(flow_module, "DigitransitClient", MismatchedClient)
+    flow = new_flow(flow_module)
+    result = asyncio.run(flow.async_step_user(user_input("E4971")))
+    assert result["type"] == "form"
+    assert result["errors"]["base"] == "invalid_name_code"
+    assert getattr(flow, "unique_id", None) is None
+
+
+def test_name_search_still_disambiguates_both_eestinmalmintie_platforms(
+    flow_module, monkeypatch
+):
+    base_client = flow_module.DigitransitClient
+
+    class StopNameClient(base_client):
+        async def search_stops(self, name):
+            return [
+                {"gtfsId": "HSL:3", "name": name, "code": "E4971"},
+                {"gtfsId": "HSL:4", "name": name, "code": "E4972"},
+            ]
+
+    monkeypatch.setattr(flow_module, "DigitransitClient", StopNameClient)
+    flow = new_flow(flow_module)
+    result = asyncio.run(flow.async_step_user(user_input("Eestinmalmintie")))
+    assert result["type"] == "form"
+    assert result["step_id"] == "select_stop"
+    chosen = asyncio.run(flow.async_step_select_stop({"selected_stop": "HSL:4"}))
+    assert chosen["type"] == "create_entry"
+    assert chosen["data"]["stop_code"] == "E4972"
