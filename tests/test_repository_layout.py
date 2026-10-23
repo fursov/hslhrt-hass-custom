@@ -47,7 +47,7 @@ def test_manifest_metadata_and_version():
     assert manifest["documentation"].startswith("https://github.com/fursov/")
     assert manifest["issue_tracker"].startswith("https://github.com/fursov/")
     assert manifest["codeowners"] == ["@fursov"]
-    assert manifest["requirements"] == ["paho-mqtt==2.1.0"]
+    assert manifest["requirements"] == ["paho-mqtt>=2.1.0"]
 
 
 def test_hacs_metadata():
