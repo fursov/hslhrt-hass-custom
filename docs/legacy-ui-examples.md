@@ -28,3 +28,14 @@ Do **not** copy the old YAML. For supported examples use the
 
 These images are kept unchanged to preserve authorship and history. They
 must not be treated as instructions for the present release.
+
+
+## 5. Pre-release 0.8.0 Options Flow (superseded)
+
+![Pre-release GPS options with the old radio-button selectors](../resources/images/stop-options.png)
+
+This image was captured from an earlier pre-release build in which HFP
+tracking lookahead and journeys-per-route settings used long radio-button
+lists. The final 0.8.0 Options Flow uses **compact drop-downs** instead.
+See [current README](../README.md#stop-setup-and-filtering) for the supported
+settings and values.

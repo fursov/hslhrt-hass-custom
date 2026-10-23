@@ -30,6 +30,7 @@ def test_one_hacs_integration_in_standard_layout():
         "hfp.py",
         "geo_location.py",
         "translations/en.json",
+        "translations/fi.json",
     ):
         assert (INTEGRATION / filename).is_file(), filename
     for filename in ("__init__.py", "config_flow.py", "const.py", "sensor.py", "manifest.json", "strings.json"):
@@ -68,6 +69,31 @@ def test_hacs_metadata():
 def test_translations_match_source_strings():
     assert load_json(INTEGRATION / "strings.json") == load_json(
         INTEGRATION / "translations" / "en.json"
+    )
+
+
+def test_finnish_translation_has_complete_english_key_coverage():
+    """No config/option/abort/error labels should silently fall back to English."""
+    source = load_json(INTEGRATION / "translations" / "en.json")
+    translated = load_json(INTEGRATION / "translations" / "fi.json")
+
+    def keys(data: dict, prefix: str = "") -> set[str]:
+        result = set()
+        for key, value in data.items():
+            path = f"{prefix}.{key}" if prefix else key
+            if isinstance(value, dict):
+                result |= keys(value, path)
+            else:
+                assert isinstance(value, str) and value.strip(), path
+                result.add(path)
+        return result
+
+    assert keys(translated) == keys(source)
+    assert translated["config"]["step"]["select_stop"]["data"]["selected_stop"] == (
+        "Pysäkki"
+    )
+    assert translated["options"]["step"]["init"]["data"]["track_vehicles"] != (
+        source["options"]["step"]["init"]["data"]["track_vehicles"]
     )
 
 
