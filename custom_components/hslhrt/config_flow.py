@@ -1,5 +1,7 @@
 """HSL stop configuration, disambiguation, options and API-key flows."""
 
+import re
+
 import voluptuous as vol
 
 from homeassistant import config_entries
@@ -85,6 +87,11 @@ class HSLHRTConfigFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                     if name.upper().startswith("HSL:"):
                         stop = await client.get_stop_info(name.upper())
                         candidates = [stop] if stop is not None else []
+                    elif re.fullmatch(r"[A-Za-z]{1,3}[0-9]{3,5}", name):
+                        # Public stop codes (E4971, H0209) are not GTFS IDs.
+                        # GraphQL stops(name:) does not resolve them reliably.
+                        candidate = await client.search_stop_by_code(name)
+                        candidates = [candidate] if candidate else []
                     else:
                         candidates = await client.search_stops(name)
                 except DigitransitAuthError:
@@ -186,6 +193,15 @@ class HSLHRTConfigFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             stop = None
         else:
             error = "invalid_name_code" if stop is None else None
+            # Reject fuzzy geocoder results for a different physical stop.
+            requested_code = candidate.get("code")
+            if (
+                error is None
+                and requested_code
+                and (stop.get("code") or "").casefold()
+                != requested_code.casefold()
+            ):
+                error = "invalid_name_code"
 
         if error is not None:
             if is_selection:

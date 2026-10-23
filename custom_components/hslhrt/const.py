@@ -18,6 +18,7 @@ CONF_SELECTED_STOP = "selected_stop"
 UNDO_UPDATE_LISTENER = "undo_update_listener"
 
 BASE_URL = "https://api.digitransit.fi/routing/v2/hsl/gtfs/v1"
+GEOCODING_URL = "https://api.digitransit.fi/geocoding/v1/search"
 CONF_API_KEY = "api_key"
 API_KEY_HEADER = "digitransit-subscription-key"
 REQUEST_TIMEOUT = 10
