@@ -2,6 +2,7 @@
 
 import ast
 import json
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,7 +56,12 @@ def test_hacs_metadata():
     hacs = load_json(ROOT / "hacs.json")
     assert hacs["name"] == "Helsinki Regional Transport"
     assert hacs["country"] == "FI"
-    assert hacs["homeassistant"] == "2025.1.0"
+    assert hacs["homeassistant"] == "2026.10.2"
+    requirements = (ROOT / "requirements-ha-tests.txt").read_text(encoding="utf-8")
+    pinned = re.search(r"^homeassistant==([0-9.]+)$", requirements, re.MULTILINE)
+    assert pinned is not None
+    # Never advertise a minimum HA version older than the tested baseline.
+    assert hacs["homeassistant"] == pinned.group(1)
     assert "content_in_root" not in hacs or hacs["content_in_root"] is False
 
 
