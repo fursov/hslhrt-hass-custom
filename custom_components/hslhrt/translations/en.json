@@ -67,7 +67,8 @@
       "cannot_connect": "Could not load routes from Digitransit",
       "invalid_api_key": "API key was rejected",
       "invalid_name_code": "Stop is unavailable",
-      "invalid_route": "Select a route serving this stop"
+      "invalid_route": "Select a route serving this stop",
+      "invalid_selection": "Choose one of the listed values"
     }
   }
 }
