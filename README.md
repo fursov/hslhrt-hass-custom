@@ -50,9 +50,18 @@ destination. The Routing API polling interval can be set to 1, 2, 3, 5, 10,
 
 For compact setup, the GPS tracking lookahead (15–90 minutes) and number of
 journeys per route (1–5) are **drop-down selectors**, rather than long radio
-lists. Tracking is optional and is disabled by default. The earlier Options
-Flow screenshot is preserved in the historical UI archive; it shows the old
-radio-button layout, not the current release.
+lists. Tracking is optional and disabled by default.
+
+<details>
+<summary>Show current compact Options Flow (Home Assistant 2026.10)</summary>
+
+![Current HSL HRT Stop preferences with compact GPS dropdowns](resources/images/stop-options-compact.png)
+
+The image shows the default GPS lookahead (30 minutes) and journeys per route
+(2). The earlier pre-release screenshot with radio-button lists remains
+available in the [historical UI archive](docs/legacy-ui-examples.md).
+
+</details>
 
 **Languages:** The setup and options dialogs are available in English and
 Finnish (*suomi*). Select Finnish in your Home Assistant user profile's
