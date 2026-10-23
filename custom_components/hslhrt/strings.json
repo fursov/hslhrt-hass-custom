@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Helsinki Regional Transport",
-        "description": "Enter a stop name or code and your Digitransit API key. Obtain a key at https://portal-api.digitransit.fi/",
+        "description": "Enter a stop name or code and your Digitransit API key. See the README for the API portal link.",
         "data": {
           "user_name_code": "Stop name or code",
           "route": "Route (ALL for any)",
@@ -13,7 +13,7 @@
       },
       "reauth_confirm": {
         "title": "Digitransit API key required",
-        "description": "Add or replace the API key to resume updates for this stop. Keys are available at https://portal-api.digitransit.fi/",
+        "description": "Add or replace the API key to resume updates for this stop. See the README for registration instructions.",
         "data": {
           "api_key": "Digitransit API key"
         }

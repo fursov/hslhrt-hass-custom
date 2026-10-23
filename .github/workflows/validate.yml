@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install test tools
-        run: python -m pip install pytest ruff
+        run: python -m pip install pytest ruff aiohttp
       - name: Ruff
         run: ruff check .
       - name: Check Python syntax
