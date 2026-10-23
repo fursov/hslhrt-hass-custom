@@ -30,6 +30,13 @@ Copy the files from `custom_components/hslhrt/` in this repository into your Hom
 - Stop name disambiguation is supported beginning with v0.6.0.
 - This version has not been live-tested against Digitransit with a personal API key; tests use fixture responses.
 
+## Fixes (v0.6.1)
+
+- **Public stop code search:** Input such as `E4971`, `E4972`, `H0209` or `Si2223` is now resolved via Digitransit Geocoding, rather than passed to the Routing GraphQL name search. The chosen GTFS stop is always checked against its public code before creating a config entry.
+- **Name search:** Names such as `Eestinmalmintie` still show a stop picker when multiple boarding platforms share the same name.
+- The same Digitransit subscription key is used for both Routing and Geocoding APIs. Ensure that your subscription permits access to Geocoding v1.
+- **No migration:** Existing config entries and entity IDs remain unchanged. This fix affects adding new stops only.
+
 ## Configuration improvements (v0.6.0)
 
 - **Stop picker:** Searching by name now offers a dropdown of matching stop platforms, including the public code and GTFS ID, instead of silently taking the first result. Exact stop codes and GTFS IDs skip the picker. The picker shows at most the first 50 valid API results; narrow your search if necessary.
