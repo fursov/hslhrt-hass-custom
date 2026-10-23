@@ -154,3 +154,22 @@ async def test_flow_field_labels_are_available_in_ha_english_translations(hass):
         translations = await async_get_translations(hass, "en", section, {"hslhrt"})
         for key, expected_label in expected.items():
             assert translations.get(key) == expected_label, key
+
+
+def test_current_ui_screenshots_exist_and_are_linked():
+    """Screenshots from a real HA instance must exist in the release README."""
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    screenshots = (
+        "configure-stop.png",
+        "select-stop.png",
+        "stop-options.png",
+        "sensor-state-history.png",
+    )
+    for filename in screenshots:
+        relative_path = f"resources/images/{filename}"
+        assert f"]({relative_path})" in readme
+        path = ROOT / relative_path
+        assert path.is_file() and path.stat().st_size > 3_000
+        assert path.read_bytes().startswith(bytes((0x89, 0x50, 0x4E, 0x47)))
+    assert "API key intentionally left blank" in readme
+    assert "not a timetable card" in readme.lower()

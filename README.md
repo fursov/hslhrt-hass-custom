@@ -34,10 +34,29 @@ Enter a stop name, public stop code (`E4971`, `E4972`) or GTFS ID
 (`HSL:...`). Name search shows a selection when multiple platforms are
 returned. The code search verifies the exact stop against Routing v2.
 
+*Initial configuration (example: Lauttasaari; API key intentionally left blank):*
+
+![HSL HRT Config Flow — stop name, route, destination and API key](resources/images/configure-stop.png)
+
+*When more than one platform matches, choose the public stop code and GTFS ID
+(example: Hakaniemi):*
+
+![HSL HRT — choose a specific stop platform](resources/images/select-stop.png)
+
 Under **Configure**, select one or more routes and a destination filter
 (`ALL` means all). A nonempty route selection takes precedence over
 destination. The Routing API polling interval can be set to 1, 2, 3, 5, 10,
 15 or 30 minutes. Existing entries keep their original filters until changed.
+
+<details>
+<summary>Show current Options Flow screenshot (routes, polling and HFP)</summary>
+
+![HSL HRT stop preferences — route selection, polling and HFP tracking](resources/images/stop-options.png)
+
+The form can be scrolled to reach all HFP lookahead and per-route choices.
+GPS tracking is optional and starts disabled.
+
+</details>
 
 ## Sensors
 
@@ -52,6 +71,18 @@ Each stop/route entry has three standard sensors:
 The legacy `ROUTES` attribute excludes the first arrival and is capped at
 20 further departures. The modern `departures` attribute includes the first
 10. These sensors remain available when GPS tracking is disabled or HFP is offline.
+
+<details>
+<summary>Show an example of the route sensor's History view</summary>
+
+![Home Assistant route sensor history — values 158 and 530 over time](resources/images/sensor-state-history.png)
+
+This is the built-in **History / Activity** view of the route sensor, showing
+how the *next route number* changes. It is **not a timetable card** and does
+not show every upcoming departure; use the `departures` attribute or the
+dashboard examples below for a timetable.
+
+</details>
 
 ## Optional HFP vehicle tracking (v0.7.0)
 
@@ -287,8 +318,10 @@ The four original UI screenshots are preserved in
 the earlier integration, **not** the current 2026.10 dashboard. The old
 template-sensor and entity-filter examples are intentionally not recommended:
 they are unnecessarily complicated and can be wrong around midnight.
-Current screenshots should only be added after capture and verification
-on an actual Home Assistant instance.
+The current configuration, stop-selection, options and route-sensor history
+screenshots above were captured in an actual Home Assistant instance. They
+show different example stops and are not a guarantee of exact entity names
+or map availability on your installation.
 
 ## Development and tests
 
