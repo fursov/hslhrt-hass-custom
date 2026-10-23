@@ -1,6 +1,5 @@
 {
   "name": "Helsinki Regional Transport",
   "country": "FI",
-  "domains": ["hslhrt"],
-  "homeassistant": "0.118.1"
+  "homeassistant": "2025.1.0"
 }
