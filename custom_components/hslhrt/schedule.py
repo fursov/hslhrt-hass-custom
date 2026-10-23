@@ -166,6 +166,8 @@ def parse_departures(
         STOP_NAME: stop.get("name") or "",
         STOP_CODE: stop.get("code") or "",
         STOP_GTFS: stop.get("gtfsId") or "",
+        "stop_latitude": stop.get("lat"),
+        "stop_longitude": stop.get("lon"),
         DICT_KEY_ROUTES: routes,
     }
 

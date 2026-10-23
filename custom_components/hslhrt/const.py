@@ -95,6 +95,8 @@ query StopDepartures($id: String!) {
     gtfsId
     name
     code
+    lat
+    lon
     stoptimesWithoutPatterns(numberOfDepartures: 100) {
       serviceDay
       scheduledArrival

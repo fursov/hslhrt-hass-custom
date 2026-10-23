@@ -141,19 +141,32 @@ geo_location_sources:
   - source: hslhrt
     label_mode: attribute
     attribute: marker_label
+  - source: hslhrt_stops
+    label_mode: icon
 auto_fit: true
 ```
 
-The map contains **all tracking-enabled configured stops**. Each vehicle
+The map shows vehicles from **all configured stops with HFP tracking enabled**,
+plus a small circle icon at every configured stop with valid coordinates
+(including stops where HFP tracking is switched off). Stop locations come
+from the existing Digitransit timetable response, requiring no additional
+API calls. Stops use the separate `hslhrt_stops` geolocation source and are
+shown independently of GPS availability. Each vehicle
 marker label defaults to an emoji and public route number (for example
 `🚌 530`, `🚋 7`, `🚇 M1`, `🚆 I`, or `⛴ 19`), where Digitransit
 provides a recognized `vehicle_mode`. Unknown types display only the route
 number rather than a guessed vehicle type. The `marker_label` and
 `vehicle_mode` attributes are also available for automations. Other
 attributes include destination, stop code, arrival time, operator/vehicle,
-position timestamp, heading and speed. The source is `hslhrt`.
+position timestamp, heading and speed. The vehicle source is `hslhrt`; the stop source is `hslhrt_stops`.
+Both use Home Assistant's standard marker size: the stop's
+`mdi:circle-small` icon appears *inside* the standard marker, not as an
+arbitrarily sized dot. Since they are real geolocation entities, configured
+stops may also show automatically on the built-in Map dashboard; no changes
+are made to that dashboard's configuration. Separate entries for the same
+physical stop can overlap or be grouped by the map.
 
-Markers **update in place** as new coordinates arrive and are completely
+Vehicle markers **update in place** as new coordinates arrive and are completely
 removed when their journey leaves the selected horizon, the GPS becomes stale,
 the configuration unloads or GPS tracking is switched off. These temporary
 entities deliberately have no permanent registry entries and cannot be pinned
@@ -311,11 +324,13 @@ The `vehicles` attribute contains individual journey records with
 `gps_available`, and fresh `latitude`/`longitude` only when known.
 Availability of coordinates is not guaranteed for every upcoming journey.
 
-### 6. Live vehicle locations (Map Card)
+### 6. Live vehicle locations and configured stops (Map Card)
 
-Requires optional HFP tracking and at least one fresh vehicle position.
-This map shows all current `geo_location` markers from the `hslhrt`
-source, including vehicles tracked by *other configured stops*.
+Stops appear as circle-icon markers as soon as their coordinates are
+available from Digitransit, even if no live GPS positions are available.
+Vehicles appear when HFP tracking is enabled and GPS is fresh. This map
+includes all configured stops and all selected vehicles across entries,
+not just the one used in the dashboard examples.
 
 ```yaml
 type: map
@@ -323,14 +338,18 @@ geo_location_sources:
   - source: hslhrt
     label_mode: attribute
     attribute: marker_label
+  - source: hslhrt_stops
+    label_mode: icon
 auto_fit: true
 ```
 
-To show **only the number**, change `attribute: marker_label` to
-`attribute: route` in the YAML. To show only the mode-dependent MDI icon,
+To show **only vehicle route numbers**, change `attribute: marker_label`
+to `attribute: route` in the YAML. Remove the `hslhrt_stops` source
+from the card to hide stops without affecting any HA entities. To show only the mode-dependent MDI icon,
 replace the `label_mode` and `attribute` lines with `label_mode: icon`.
 The built-in Map Card does not render separate icon-and-text controls in the
-same marker; `marker_label` is a simple combined text alternative.
+same marker; `marker_label` is a simple combined text alternative. Stop
+markers use `label_mode: icon` with the `mdi:circle-small` icon.
 
 Markers are temporary; they disappear if GPS ages beyond 90 seconds or
 a journey is no longer selected. A blank map does not mean timetable sensors

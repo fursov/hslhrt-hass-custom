@@ -52,6 +52,8 @@ def stop_response():
             "gtfsId": "HSL:1000",
             "name": "Example",
             "code": "E4971",
+            "lat": 60.205,
+            "lon": 24.9,
             "stoptimesWithoutPatterns": [
                 {
                     "serviceDay": service_day,
