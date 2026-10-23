@@ -11,6 +11,17 @@ MANUFACTURER = "Helsinki Regional Transport Authority"
 COORDINATOR = "coordinator"
 MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=1)
 DEFAULT_SCAN_INTERVAL = 1
+CONF_HFP_ENABLED = "track_vehicles"
+CONF_HFP_HORIZON = "tracking_horizon_minutes"
+CONF_HFP_PER_ROUTE = "tracking_per_route"
+DEFAULT_HFP_HORIZON = 30
+DEFAULT_HFP_PER_ROUTE = 2
+HFP_HOST = "mqtt.hsl.fi"
+HFP_PORT = 8883
+HFP_MAX_SUBSCRIPTIONS = 32
+HFP_STALE_SECONDS = 90
+HFP_POSITION_UPDATE_SECONDS = 5
+HFP_MANAGER = "hfp_manager"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_ROUTES = "routes_filter"
 CONF_DESTINATION_FILTER = "destination_filter"
@@ -91,7 +102,13 @@ query StopDepartures($id: String!) {
       realtimeState
       headsign
       trip {
+        directionId
+        departureStoptime {
+          serviceDay
+          scheduledDeparture
+        }
         route {
+          gtfsId
           shortName
         }
       }
