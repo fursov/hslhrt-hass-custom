@@ -102,7 +102,7 @@ def coordinator(rows):
 
 def test_sensor_registration_preserves_legacy_unique_id(sensors):
     co = coordinator([trip(NOW + 121)])
-    hass = {"hslhrt": {"entry1": {"coordinator": co}}}
+    hass = SimpleNamespace(data={"hslhrt": {"entry1": {"coordinator": co}}})
     entities = []
     asyncio.run(sensors.async_setup_entry(hass, config_entry(), entities.extend))
     assert len(entities) == 3
