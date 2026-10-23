@@ -62,6 +62,7 @@ def parse_departures(
     stop: dict,
     route_filter: str = ALL,
     destination_filter: str = ALL,
+    route_filters: list[str] | None = None,
 ) -> dict:
     """Convert serviceDay-relative times to local Helsinki arrival times.
 
@@ -83,7 +84,14 @@ def parse_departures(
         destination = (item.get("headsign") or "").strip()
         if not route:
             continue
-        if route_filter and route_filter.casefold() != ALL:
+        if route_filters is not None:
+            selected = {name.casefold() for name in route_filters}
+            if selected and route.casefold() not in selected:
+                continue
+            if not selected and destination_filter.casefold() != ALL:
+                if destination_filter.casefold() not in destination.casefold():
+                    continue
+        elif route_filter and route_filter.casefold() != ALL:
             if route.casefold() != route_filter.casefold():
                 continue
         elif destination_filter and destination_filter.casefold() != ALL:

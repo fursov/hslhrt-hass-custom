@@ -121,3 +121,26 @@ def test_upcoming_departures_discard_expired_keep_order_without_mutation():
     assert len(data["routes"]) == 4
     assert schedule.upcoming_departures({}, 100) == []
     assert schedule.upcoming_departures(None, 100) == []
+
+
+
+def test_multiple_route_filter_and_destination_precedence():
+    epoch = 1792702800
+    stop = make_stop([
+        departure(epoch, 300, route="8", destination="West"),
+        departure(epoch, 500, route="2", destination="East"),
+        departure(epoch, 400, route="4", destination="East"),
+    ])
+    # Explicit route list overrides destination filter.
+    rows = schedule.parse_departures(
+        stop, "ALL", "West", route_filters=["2", "4"]
+    )["routes"]
+    assert [r["route"] for r in rows] == ["4", "2"]
+    # Empty list means all routes; direction can still restrict them.
+    rows = schedule.parse_departures(
+        stop, "8", "East", route_filters=[]
+    )["routes"]
+    assert [r["route"] for r in rows] == ["4", "2"]
+    # Existing route-only entries still use the v0.5 filtering semantics.
+    rows = schedule.parse_departures(stop, "8", "East")["routes"]
+    assert [r["route"] for r in rows] == ["8"]

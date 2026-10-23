@@ -1,14 +1,32 @@
-"""Configuration and API-key reauthentication for HSL HRT."""
+"""HSL stop configuration, disambiguation, options and API-key flows."""
 
 import voluptuous as vol
 
 from homeassistant import config_entries
+from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import (
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 
 from .client import DigitransitAuthError, DigitransitClient, DigitransitError
+from .configuration import (
+    available_routes,
+    default_selected_routes,
+    scan_interval_minutes,
+    stop_candidates,
+)
 from .const import (
     ALL,
     CONF_API_KEY,
+    CONF_DESTINATION_FILTER,
+    CONF_ROUTES,
+    CONF_SCAN_INTERVAL,
+    CONF_SELECTED_STOP,
+    DEFAULT_SCAN_INTERVAL,
     DESTINATION,
     DOMAIN,
     NAME_CODE,
@@ -17,109 +35,269 @@ from .const import (
     STOP_GTFS,
     STOP_NAME,
 )
-from .schedule import base_unique_id, route_matches, select_stop
+from .schedule import base_unique_id, route_matches
 
 
 def _normalized(value: str) -> str:
-    """Normalize optional route and destination filters."""
+    """Normalize a route or destination filter."""
     return value.strip() or ALL
 
 
-async def _resolve_stop(client: DigitransitClient, name_or_code: str) -> dict | None:
-    """Search first, then read patterns from the selected stop."""
-    if name_or_code.upper().startswith("HSL:"):
-        return await client.get_stop_info(name_or_code.upper())
-    candidates = await client.search_stops(name_or_code)
-    selected = select_stop(candidates, name_or_code)
-    if selected is None or not selected.get("gtfsId"):
-        return None
-    return await client.get_stop_info(selected["gtfsId"])
+def _stop_title(stop: dict) -> str:
+    """Keep public stop code and GTFS ID visible for duplicate stop names."""
+    return (
+        f"{stop.get('name') or 'Unknown'} "
+        f"({stop.get('code') or 'no code'}) — {stop['gtfsId']}"
+    )
 
 
 class HSLHRTConfigFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
-    """Manage stop entries while retaining their original unique IDs."""
+    """Manage stop configuration without migrating existing entry IDs."""
 
-    VERSION = 1  # Older config entries must continue to load without migration.
+    VERSION = 1
+
+    def __init__(self) -> None:
+        """Hold pending stop choices only for the current UI flow."""
+        self._pending: dict | None = None
+        self._candidates: dict[str, dict] = {}
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        """Expose the options flow on existing stop entries."""
+        return HSLHRTOptionsFlow()
 
     async def async_step_user(self, user_input=None):
-        """Create a stop entry with a valid Digitransit subscription key."""
+        """Search for stops and offer a choice if the name is ambiguous."""
         errors = {}
         if user_input is not None:
-            stop_query = user_input[NAME_CODE].strip()
-            route = _normalized(user_input[ROUTE])
-            destination = _normalized(user_input[DESTINATION])
+            name = user_input[NAME_CODE].strip()
             key = user_input[CONF_API_KEY].strip()
-
-            if not stop_query:
+            if not name:
                 errors[NAME_CODE] = "invalid_name_code"
             elif not key:
                 errors[CONF_API_KEY] = "invalid_api_key"
             else:
+                route = _normalized(user_input[ROUTE])
+                destination = _normalized(user_input[DESTINATION])
                 client = DigitransitClient(async_get_clientsession(self.hass), key)
                 try:
-                    stop = await _resolve_stop(client, stop_query)
+                    if name.upper().startswith("HSL:"):
+                        stop = await client.get_stop_info(name.upper())
+                        candidates = [stop] if stop is not None else []
+                    else:
+                        candidates = await client.search_stops(name)
                 except DigitransitAuthError:
                     errors["base"] = "invalid_api_key"
                 except DigitransitError:
                     errors["base"] = "cannot_connect"
                 else:
-                    if stop is None:
+                    choices = stop_candidates(candidates)
+                    if not choices:
                         errors[NAME_CODE] = "invalid_name_code"
-                    elif not route_matches(stop, route, destination):
-                        errors[ROUTE if route.casefold() != ALL else DESTINATION] = (
-                            "invalid_route"
-                            if route.casefold() != ALL
-                            else "invalid_destination"
-                        )
                     else:
-                        uid = base_unique_id(stop["gtfsId"], route, destination)
-                        await self.async_set_unique_id(uid)
-                        self._abort_if_unique_id_configured()
-                        suffix = (
-                            route.upper()
-                            if route.casefold() != ALL
-                            else destination.upper()
-                            if destination.casefold() != ALL
-                            else "ALL"
+                        self._pending = {
+                            ROUTE: route,
+                            DESTINATION: destination,
+                            CONF_API_KEY: key,
+                        }
+                        self._candidates = {
+                            stop["gtfsId"]: stop for stop in choices
+                        }
+                        # Only code/GTFS ID is unique. A stop *name* can match
+                        # two or more platforms, even if names are identical.
+                        exact_code = next(
+                            (
+                                stop
+                                for stop in choices
+                                if name.casefold()
+                                in (
+                                    (stop.get("code") or "").casefold(),
+                                    stop["gtfsId"].casefold(),
+                                )
+                            ),
+                            None,
                         )
-                        return self.async_create_entry(
-                            title=f"{stop['name']}({stop.get('code') or ''}) {suffix}",
-                            data={
-                                STOP_GTFS: stop["gtfsId"],
-                                STOP_NAME: stop["name"],
-                                STOP_CODE: stop.get("code") or "",
-                                ROUTE: route,
-                                DESTINATION: destination,
-                                CONF_API_KEY: key,
-                            },
-                        )
+                        if exact_code is not None or len(choices) == 1:
+                            return await self._async_create_stop(
+                                exact_code or choices[0]
+                            )
+                        return await self.async_step_select_stop()
 
-        schema = vol.Schema(
-            {
-                vol.Required(NAME_CODE, default=""): str,
-                vol.Required(ROUTE, default="ALL"): str,
-                vol.Required(DESTINATION, default="ALL"): str,
-                vol.Required(CONF_API_KEY): str,
-            }
-        )
         return self.async_show_form(
-            step_id="user", data_schema=schema, errors=errors
+            step_id="user",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(NAME_CODE, default=""): str,
+                    vol.Required(ROUTE, default=ALL.upper()): str,
+                    vol.Required(DESTINATION, default=ALL.upper()): str,
+                    vol.Required(CONF_API_KEY): str,
+                }
+            ),
+            errors=errors,
+        )
+
+    async def async_step_select_stop(self, user_input=None):
+        """Let the user disambiguate identical or similar stop names."""
+        if not self._pending or not self._candidates:
+            return self.async_abort(reason="missing_stop_selection")
+
+        errors = {}
+        if user_input is not None:
+            selected = self._candidates.get(user_input.get(CONF_SELECTED_STOP))
+            if selected is None:
+                errors["base"] = "invalid_name_code"
+            else:
+                return await self._async_create_stop(selected)
+
+        choices = [
+            SelectOptionDict(value=gtfs_id, label=_stop_title(stop))
+            for gtfs_id, stop in self._candidates.items()
+        ]
+        return self.async_show_form(
+            step_id="select_stop",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_SELECTED_STOP): SelectSelector(
+                        SelectSelectorConfig(
+                            options=choices, mode=SelectSelectorMode.DROPDOWN
+                        )
+                    )
+                }
+            ),
+            errors=errors,
+        )
+
+    async def _async_create_stop(self, candidate):
+        """Resolve selected stop details and create a validated entry."""
+        assert self._pending is not None
+        client = DigitransitClient(
+            async_get_clientsession(self.hass), self._pending[CONF_API_KEY]
+        )
+        is_selection = len(self._candidates) > 1
+        step_id = "select_stop" if is_selection else "user"
+        try:
+            stop = await client.get_stop_info(candidate["gtfsId"])
+        except DigitransitAuthError:
+            error = "invalid_api_key"
+            stop = None
+        except DigitransitError:
+            error = "cannot_connect"
+            stop = None
+        else:
+            error = "invalid_name_code" if stop is None else None
+
+        if error is not None:
+            if is_selection:
+                return self.async_show_form(
+                    step_id="select_stop",
+                    data_schema=vol.Schema(
+                        {
+                            vol.Required(CONF_SELECTED_STOP): SelectSelector(
+                                SelectSelectorConfig(
+                                    options=[
+                                        SelectOptionDict(
+                                            value=ident, label=_stop_title(value)
+                                        )
+                                        for ident, value in self._candidates.items()
+                                    ],
+                                    mode=SelectSelectorMode.DROPDOWN,
+                                )
+                            )
+                        }
+                    ),
+                    errors={"base": error},
+                )
+            # Do not persist or echo API keys on a failed form.
+            return self.async_show_form(
+                step_id="user",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required(NAME_CODE): str,
+                        vol.Required(ROUTE, default=ALL.upper()): str,
+                        vol.Required(DESTINATION, default=ALL.upper()): str,
+                        vol.Required(CONF_API_KEY): str,
+                    }
+                ),
+                errors={"base": error},
+            )
+
+        route = self._pending[ROUTE]
+        destination = self._pending[DESTINATION]
+        if not route_matches(stop, route, destination):
+            error = "invalid_route" if route.casefold() != ALL else "invalid_destination"
+            if is_selection:
+                # Destination/route is unsuitable for the chosen platform.
+                return await self._show_stop_error(error)
+            return self.async_show_form(
+                step_id="user",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required(NAME_CODE): str,
+                        vol.Required(ROUTE, default=ALL.upper()): str,
+                        vol.Required(DESTINATION, default=ALL.upper()): str,
+                        vol.Required(CONF_API_KEY): str,
+                    }
+                ),
+                errors={"base": error},
+            )
+
+        uid = base_unique_id(stop["gtfsId"], route, destination)
+        await self.async_set_unique_id(uid)
+        self._abort_if_unique_id_configured()
+        suffix = (
+            route.upper()
+            if route.casefold() != ALL
+            else destination.upper()
+            if destination.casefold() != ALL
+            else "ALL"
+        )
+        return self.async_create_entry(
+            title=f"{stop['name']}({stop.get('code') or ''}) {suffix}",
+            data={
+                STOP_GTFS: stop["gtfsId"],
+                STOP_NAME: stop["name"],
+                STOP_CODE: stop.get("code") or "",
+                ROUTE: route,
+                DESTINATION: destination,
+                CONF_API_KEY: self._pending[CONF_API_KEY],
+            },
+        )
+
+    async def _show_stop_error(self, error: str):
+        """Redisplay the stop picker with a validation error."""
+        return self.async_show_form(
+            step_id="select_stop",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_SELECTED_STOP): SelectSelector(
+                        SelectSelectorConfig(
+                            options=[
+                                SelectOptionDict(value=key, label=_stop_title(stop))
+                                for key, stop in self._candidates.items()
+                            ],
+                            mode=SelectSelectorMode.DROPDOWN,
+                        )
+                    )
+                }
+            ),
+            errors={"base": error},
         )
 
     async def async_step_reauth(self, entry_data):
-        """Start an API key flow for an existing entry."""
+        """Start reauthentication without deleting existing stop entries."""
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(self, user_input=None):
-        """Add/replace the API key without deleting the existing entry."""
+        """Add or rotate the subscription key."""
         return await self._async_update_key("reauth_confirm", user_input)
 
     async def async_step_reconfigure(self, user_input=None):
-        """Allow manual key rotation from the integration menu."""
+        """Support explicit subscription-key rotation."""
         return await self._async_update_key("reconfigure", user_input)
 
     async def _async_update_key(self, step_id, user_input):
-        """Validate a key against the already configured stop."""
+        """Verify a key against the existing stop without losing options."""
         errors = {}
         entry = (
             self._get_reauth_entry()
@@ -152,4 +330,105 @@ class HSLHRTConfigFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             step_id=step_id,
             data_schema=vol.Schema({vol.Required(CONF_API_KEY): str}),
             errors=errors,
+        )
+
+
+class HSLHRTOptionsFlow(config_entries.OptionsFlow):
+    """Manage route/destination filtering and per-entry poll interval."""
+
+    def __init__(self) -> None:
+        """Create temporary route choices."""
+        self._available_routes: list[str] | None = None
+
+    async def async_step_init(self, user_input=None):
+        """Allow multiple routes and interval selection without new entities."""
+        entry = self.config_entry
+        errors = {}
+        previously_selected = default_selected_routes(entry.data, entry.options)
+
+        if self._available_routes is None:
+            client = DigitransitClient(
+                async_get_clientsession(self.hass), entry.data[CONF_API_KEY]
+            )
+            try:
+                stop = await client.get_stop_info(entry.data[STOP_GTFS])
+            except DigitransitAuthError:
+                errors["base"] = "invalid_api_key"
+            except DigitransitError:
+                errors["base"] = "cannot_connect"
+            else:
+                if stop is None:
+                    errors["base"] = "invalid_name_code"
+                else:
+                    self._available_routes = available_routes(stop)
+
+        if self._available_routes is None:
+            return self.async_show_form(
+                step_id="init",
+                data_schema=vol.Schema({}),
+                errors=errors,
+            )
+
+        all_routes = sorted(
+            {*self._available_routes, *previously_selected}, key=str.casefold
+        )
+        if user_input is not None:
+            selected = user_input.get(CONF_ROUTES, [])
+            valid_routes = {route.casefold() for route in all_routes}
+            if not isinstance(selected, list) or any(
+                not isinstance(route, str)
+                or route.casefold() not in valid_routes
+                for route in selected
+            ):
+                errors[CONF_ROUTES] = "invalid_route"
+            else:
+                destination = _normalized(
+                    user_input.get(CONF_DESTINATION_FILTER, ALL)
+                )
+                interval = user_input[CONF_SCAN_INTERVAL]
+                return self.async_create_entry(
+                    title="",
+                    data={
+                        CONF_ROUTES: sorted(set(selected), key=str.casefold),
+                        CONF_DESTINATION_FILTER: destination,
+                        CONF_SCAN_INTERVAL: interval,
+                    },
+                )
+
+        selected_default = (
+            entry.options.get(CONF_ROUTES, previously_selected)
+            if user_input is None
+            else user_input.get(CONF_ROUTES, previously_selected)
+        )
+        destination_default = (
+            entry.options.get(
+                CONF_DESTINATION_FILTER, entry.data.get(DESTINATION, ALL)
+            )
+            if user_input is None
+            else user_input.get(CONF_DESTINATION_FILTER, ALL)
+        )
+        interval_default = (
+            scan_interval_minutes(entry.options)
+            if user_input is None
+            else user_input.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        )
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_ROUTES, default=selected_default): SelectSelector(
+                    SelectSelectorConfig(
+                        options=all_routes,
+                        multiple=True,
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    CONF_DESTINATION_FILTER, default=destination_default
+                ): str,
+                vol.Required(
+                    CONF_SCAN_INTERVAL, default=interval_default
+                ): vol.In([1, 2, 3, 5, 10, 15, 30]),
+            }
+        )
+        return self.async_show_form(
+            step_id="init", data_schema=schema, errors=errors
         )

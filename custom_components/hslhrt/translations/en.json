@@ -24,6 +24,13 @@
         "data": {
           "api_key": "Digitransit API key"
         }
+      },
+      "select_stop": {
+        "title": "Select a stop",
+        "description": "Several platforms or stops match your search. Choose the correct public stop code.",
+        "data": {
+          "selected_stop": "Stop"
+        }
       }
     },
     "error": {
@@ -37,7 +44,27 @@
     "abort": {
       "already_configured": "Stop and route already configured",
       "reauth_successful": "API key updated",
-      "reconfigure_successful": "API key updated"
+      "reconfigure_successful": "API key updated",
+      "missing_stop_selection": "Restart the configuration to search for a stop"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Stop preferences",
+        "description": "Select zero routes to include all routes. A nonempty route selection takes precedence over destination. Changes reload the integration.",
+        "data": {
+          "routes_filter": "Routes (empty = all)",
+          "destination_filter": "Destination filter (ALL = any)",
+          "scan_interval": "Refresh interval (minutes)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not load routes from Digitransit",
+      "invalid_api_key": "API key was rejected",
+      "invalid_name_code": "Stop is unavailable",
+      "invalid_route": "Select a route serving this stop"
     }
   }
 }

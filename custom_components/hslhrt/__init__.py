@@ -1,5 +1,7 @@
 """HSL HRT integration: Digitransit Routing v2 polling coordinator."""
 
+from datetime import timedelta
+
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import config_validation as cv
@@ -9,18 +11,15 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .client import DigitransitAuthError, DigitransitClient, DigitransitError
 from .const import (
-    ALL,
     CONF_API_KEY,
     COORDINATOR,
-    DESTINATION,
     DOMAIN,
-    MIN_TIME_BETWEEN_UPDATES,
-    ROUTE,
     STOP_GTFS,
     UNDO_UPDATE_LISTENER,
     _LOGGER,
 )
-from .schedule import base_unique_id, parse_departures
+from .configuration import effective_filters, scan_interval_minutes
+from .schedule import parse_departures
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS = ["sensor"]
@@ -79,19 +78,25 @@ class HSLHRTDataUpdateCoordinator(DataUpdateCoordinator):
 
     def __init__(self, hass, client: DigitransitClient, config_entry) -> None:
         super().__init__(
-            hass, _LOGGER, name=DOMAIN, update_interval=MIN_TIME_BETWEEN_UPDATES
+            hass,
+            _LOGGER,
+            name=DOMAIN,
+            update_interval=timedelta(
+                minutes=scan_interval_minutes(config_entry.options)
+            ),
         )
         self._client = client
         self.gtfs_id = config_entry.data[STOP_GTFS]
-        self.route = config_entry.data.get(ROUTE, ALL) or ALL
-        self.dest = config_entry.data.get(DESTINATION, ALL) or ALL
+        self.route, self.dest, self.routes = effective_filters(
+            config_entry.data, config_entry.options
+        )
 
     async def _async_update_data(self) -> dict:
         try:
             stop = await self._client.get_departures(self.gtfs_id)
             if stop is None:
                 raise UpdateFailed("Stop not found in Digitransit")
-            return parse_departures(stop, self.route, self.dest)
+            return parse_departures(stop, self.route, self.dest, self.routes)
         except DigitransitAuthError as error:
             raise ConfigEntryAuthFailed("Digitransit API key was rejected") from error
         except (DigitransitError, ValueError, TypeError, OverflowError) as error:
