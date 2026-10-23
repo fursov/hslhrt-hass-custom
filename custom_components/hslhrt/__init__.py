@@ -18,6 +18,7 @@ from .const import (
     DEFAULT_HFP_HORIZON,
     DEFAULT_HFP_PER_ROUTE,
     HFP_MANAGER,
+    GEO_LOCATION_CONTROLLER,
     COORDINATOR,
     DOMAIN,
     STOP_GTFS,
@@ -29,7 +30,7 @@ from .hfp import HFPManager
 from .schedule import parse_departures
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
-PLATFORMS = ["sensor"]
+PLATFORMS = ["sensor", "geo_location"]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -82,6 +83,9 @@ async def async_setup_entry(hass: HomeAssistant, config_entry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, config_entry) -> bool:
     """Unload platforms and unsubscribe listeners."""
+    data = hass.data[DOMAIN].get(config_entry.entry_id)
+    if data is not None and data.get(GEO_LOCATION_CONTROLLER) is not None:
+        await data[GEO_LOCATION_CONTROLLER].async_stop()
     if not await hass.config_entries.async_unload_platforms(config_entry, PLATFORMS):
         return False
     data = hass.data[DOMAIN].pop(config_entry.entry_id, None)

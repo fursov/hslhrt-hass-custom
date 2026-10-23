@@ -5,7 +5,9 @@
     "@fursov"
   ],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": [
+    "geo_location"
+  ],
   "documentation": "https://github.com/fursov/hslhrt-hass-custom",
   "integration_type": "service",
   "iot_class": "cloud_polling",
@@ -13,5 +15,5 @@
   "requirements": [
     "paho-mqtt>=2.1.0"
   ],
-  "version": "0.7.0"
+  "version": "0.8.0"
 }

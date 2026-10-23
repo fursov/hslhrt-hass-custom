@@ -22,6 +22,7 @@ HFP_MAX_SUBSCRIPTIONS = 32
 HFP_STALE_SECONDS = 90
 HFP_POSITION_UPDATE_SECONDS = 5
 HFP_MANAGER = "hfp_manager"
+GEO_LOCATION_CONTROLLER = "geo_location_controller"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_ROUTES = "routes_filter"
 CONF_DESTINATION_FILTER = "destination_filter"

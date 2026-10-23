@@ -27,6 +27,7 @@ def test_one_hacs_integration_in_standard_layout():
         "schedule.py",
         "configuration.py",
         "hfp.py",
+        "geo_location.py",
         "translations/en.json",
     ):
         assert (INTEGRATION / filename).is_file(), filename
@@ -42,7 +43,7 @@ def test_manifest_metadata_and_version():
         "name",
         *sorted(key for key in manifest if key not in ("domain", "name")),
     ]
-    assert manifest["version"] == "0.7.0"
+    assert manifest["version"] == "0.8.0"
     assert manifest["config_flow"] is True
     assert manifest["documentation"].startswith("https://github.com/fursov/")
     assert manifest["issue_tracker"].startswith("https://github.com/fursov/")
