@@ -1,8 +1,8 @@
-"""Temporary HFP vehicle locations for Home Assistant's native Map card.
+"""Vehicle and configured-stop locations for Home Assistant's native Map card.
 
-This platform creates entities only for *fresh* HFP vehicle positions. Unlike
-permanent sensors, journey entities have no unique_id and do not enter the
-entity registry. When a journey ends or GPS expires, its entity is removed.
+Vehicles are temporary (fresh HFP GPS only); configured stops remain visible
+independently of HFP, so the map is useful even with no active vehicles.
+Neither location type enters the permanent entity registry.
 """
 
 import asyncio
@@ -14,10 +14,49 @@ from homeassistant.components.geo_location import GeolocationEvent
 from homeassistant.const import ATTR_ATTRIBUTION, UnitOfLength
 from homeassistant.util.location import distance as distance_meters
 
-from .const import ATTRIBUTION, DOMAIN, GEO_LOCATION_CONTROLLER, HFP_MANAGER
+from .const import (
+    ATTRIBUTION,
+    COORDINATOR,
+    DOMAIN,
+    GEO_LOCATION_CONTROLLER,
+    HFP_MANAGER,
+    STOP_CODE,
+    STOP_GTFS,
+    STOP_NAME,
+)
 from .vehicle import marker_label, vehicle_icon
 
 SOURCE = DOMAIN
+STOP_SOURCE = f"{DOMAIN}_stops"
+
+
+def stop_coordinates(data: dict | None) -> tuple[float, float] | None:
+    """Accept only real, finite Digitransit stop coordinates."""
+    data = data or {}
+    latitude, longitude = data.get("stop_latitude"), data.get("stop_longitude")
+    if (
+        type(latitude) not in (int, float)
+        or type(longitude) not in (int, float)
+        or not math.isfinite(latitude)
+        or not math.isfinite(longitude)
+        or not (-90 <= latitude <= 90)
+        or not (-180 <= longitude <= 180)
+    ):
+        return None
+    return float(latitude), float(longitude)
+
+
+def _distance_from_home(hass, latitude: float, longitude: float) -> float | None:
+    """Report kilometers when Home Assistant has a configured home location."""
+    if hass.config.latitude is None or hass.config.longitude is None:
+        return None
+    return round(
+        distance_meters(
+            hass.config.latitude, hass.config.longitude, latitude, longitude
+        ) / 1000,
+        1,
+    )
+
 
 
 def journey_key(row: dict) -> tuple[str, str, str, str] | None:
@@ -52,13 +91,67 @@ def active_positions(rows: list[dict]) -> dict[tuple[str, str, str, str], dict]:
 async def async_setup_entry(hass, config_entry, async_add_entities) -> None:
     """Watch optional HFP updates and publish temporary geolocation entities."""
     data = hass.data[DOMAIN][config_entry.entry_id]
-    if (manager := data.get(HFP_MANAGER)) is None:
-        return
     controller = HSLHRTMapController(
-        hass, config_entry, manager, async_add_entities
+        hass,
+        config_entry,
+        data.get(HFP_MANAGER),
+        async_add_entities,
+        data[COORDINATOR],
     )
     data[GEO_LOCATION_CONTROLLER] = controller
     controller.start()
+
+
+class HSLHRTStopLocation(GeolocationEvent):
+    """A selected physical stop, independent of live-vehicle GPS coverage."""
+
+    _attr_should_poll = False
+    _attr_icon = "mdi:circle-small"
+    _attr_unit_of_measurement = UnitOfLength.KILOMETERS
+
+    def __init__(self, hass, entry, coords: tuple[float, float]) -> None:
+        self._hass_ref = hass
+        self._latitude, self._longitude = coords
+        self._stop_name = entry.data.get(STOP_NAME, "")
+        self._stop_code = entry.data.get(STOP_CODE, "")
+        self._stop_gtfs = entry.data.get(STOP_GTFS, "")
+        signature = hashlib.sha256(
+            (entry.entry_id + ":" + self._stop_gtfs).encode()
+        ).hexdigest()[:16]
+        self.entity_id = f"geo_location.hslhrt_stop_{signature}"
+        self._attr_name = f"{self._stop_name} ({self._stop_code})"
+
+    @property
+    def source(self) -> str:
+        return STOP_SOURCE
+
+    @property
+    def latitude(self) -> float:
+        return self._latitude
+
+    @property
+    def longitude(self) -> float:
+        return self._longitude
+
+    @property
+    def distance(self) -> float | None:
+        return _distance_from_home(self._hass_ref, self.latitude, self.longitude)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {
+            ATTR_ATTRIBUTION: ATTRIBUTION,
+            "stop_name": self._stop_name,
+            "stop_code": self._stop_code,
+            "stop_gtfs": self._stop_gtfs,
+        }
+
+    def update_location(self, coords: tuple[float, float]) -> None:
+        if coords == (self._latitude, self._longitude):
+            return
+        self._latitude, self._longitude = coords
+        if self.hass is not None:
+            self.async_write_ha_state()
 
 
 class HSLHRTVehicleLocation(GeolocationEvent):
@@ -106,16 +199,7 @@ class HSLHRTVehicleLocation(GeolocationEvent):
     @property
     def distance(self) -> float | None:
         """Distance in km from the configured Home Assistant location."""
-        latitude = self._hass_ref.config.latitude
-        longitude = self._hass_ref.config.longitude
-        if latitude is None or longitude is None:
-            return None
-        return round(
-            distance_meters(
-                latitude, longitude, self.latitude, self.longitude
-            ) / 1000,
-            1,
-        )
+        return _distance_from_home(self._hass_ref, self.latitude, self.longitude)
 
     @property
     def extra_state_attributes(self) -> dict:
@@ -158,12 +242,15 @@ class HSLHRTMapController:
     """Reconcile Home Assistant map entities with the current HFP positions."""
 
     def __init__(
-        self, hass, entry, manager, async_add_entities: Callable
+        self, hass, entry, manager, async_add_entities: Callable, coordinator
     ) -> None:
         self._hass = hass
         self._entry = entry
         self._manager = manager
+        self._coordinator = coordinator
         self._async_add_entities = async_add_entities
+        self._stop_entity: HSLHRTStopLocation | None = None
+        self._remove_coordinator: Callable | None = None
         self._entities: dict[tuple[str, str, str, str], HSLHRTVehicleLocation] = {}
         self._unsubscribe: Callable | None = None
         self._task: asyncio.Task | None = None
@@ -172,7 +259,11 @@ class HSLHRTMapController:
 
     def start(self) -> None:
         """Receive the same throttled GPS updates as the tracked-vehicles sensor."""
-        self._unsubscribe = self._manager.add_listener(self._schedule_sync)
+        self._remove_coordinator = self._coordinator.async_add_listener(
+            self._schedule_sync
+        )
+        if self._manager is not None:
+            self._unsubscribe = self._manager.add_listener(self._schedule_sync)
         self._schedule_sync()
 
     def _schedule_sync(self) -> None:
@@ -187,7 +278,26 @@ class HSLHRTMapController:
         """Add, update and remove markers without retaining stale entities."""
         while self._dirty and not self._stopped:
             self._dirty = False
-            active = active_positions(self._manager.visible())
+            coords = stop_coordinates(self._coordinator.data)
+            if coords is None and self._stop_entity is not None:
+                entity = self._stop_entity
+                self._stop_entity = None
+                if entity.hass is not None:
+                    await entity.async_remove(force_remove=True)
+            elif coords is not None:
+                if self._stop_entity is None:
+                    self._stop_entity = HSLHRTStopLocation(
+                        self._hass, self._entry, coords
+                    )
+                    self._async_add_entities([self._stop_entity])
+                else:
+                    self._stop_entity.update_location(coords)
+
+            active = (
+                active_positions(self._manager.visible())
+                if self._manager is not None
+                else {}
+            )
             desired = set(active)
             for key in tuple(self._entities):
                 if key not in desired:
@@ -215,7 +325,11 @@ class HSLHRTMapController:
         if self._unsubscribe is not None:
             self._unsubscribe()
             self._unsubscribe = None
+        if self._remove_coordinator is not None:
+            self._remove_coordinator()
+            self._remove_coordinator = None
         if self._task is not None:
             await self._task
             self._task = None
         self._entities.clear()
+        self._stop_entity = None
