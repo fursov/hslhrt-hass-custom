@@ -30,6 +30,11 @@ Copy the files from `custom_components/hslhrt/` in this repository into your Hom
 - Initial stop selection uses the first search result when no exact stop code/name matches; an improved interactive stop picker is planned for a later PR.
 - This version has not been live-tested against Digitransit with a personal API key; tests use fixture responses.
 
+## Maintenance (v0.5.1)
+
+- Fix loading the configuration flow on recent Home Assistant versions: `ConfigType` is imported from `homeassistant.helpers.typing`, not `homeassistant.core`.
+- No changes to existing configured stops, API keys, sensor IDs or polling behavior.
+
 ## Sensors (v0.5.0)
 
 Each configured stop/route creates three sensors:
