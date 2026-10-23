@@ -107,3 +107,17 @@ def test_route_validation():
     assert schedule.route_matches(stop, "ALL", "kamppi")
     assert not schedule.route_matches(stop, "33", "ALL")
     assert not schedule.route_matches(stop, "ALL", "Espoo")
+
+
+def test_upcoming_departures_discard_expired_keep_order_without_mutation():
+    data = {"routes": [
+        {"route": "8", "arrival_timestamp": 105},
+        {"route": "8", "arrival_timestamp": 99},
+        {"route": "2", "arrival_timestamp": 102},
+        {"route": "4", "arrival_timestamp": None},
+    ]}
+    upcoming = schedule.upcoming_departures(data, 100)
+    assert [row["arrival_timestamp"] for row in upcoming] == [102, 105]
+    assert len(data["routes"]) == 4
+    assert schedule.upcoming_departures({}, 100) == []
+    assert schedule.upcoming_departures(None, 100) == []

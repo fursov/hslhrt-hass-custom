@@ -30,6 +30,24 @@ Copy the files from `custom_components/hslhrt/` in this repository into your Hom
 - Initial stop selection uses the first search result when no exact stop code/name matches; an improved interactive stop picker is planned for a later PR.
 - This version has not been live-tested against Digitransit with a personal API key; tests use fixture responses.
 
+## Sensors (v0.5.0)
+
+Each configured stop/route creates three sensors:
+
+| Sensor | Example state | Notes |
+| --- | --- | --- |
+| Existing route sensor | `8` | Maintains the original `unique_id` and the legacy `ROUTE`, `DESTINATION`, `ARRIVAL TIME`, and `ROUTES` attributes |
+| Next arrival | `2026-10-23T12:15:00+00:00` | Timestamp sensor (timezone-aware UTC); Home Assistant displays it in the local timezone |
+| Minutes until arrival | `4` | Numeric sensor, unit `min`, updated with the stop's one-minute polling cycle and rounded up |
+
+**Entity IDs:** Home Assistant generates entity IDs from names and its entity registry. Existing entity IDs are not renamed intentionally. The new entity IDs may differ depending on previous installations and user customizations.
+
+The route sensor also exposes a compact `departures` list **including** the next arrival, with route, destination, scheduled/realtime timestamps, and delay in seconds. The existing `ROUTES` attribute still **excludes** the next arrival, consistent with v0.4.0 and the historical implementation. For storage safety, it contains at most **20 subsequent departures**; `departures` contains at most **10 departures**. The original query still requests up to 100 journeys. Expired and cancelled departures are not included.
+
+Stop metadata (`STOP NAME`, `STOP CODE`, `GTFS ID`) is present even if there are no upcoming journeys. If the stop has no upcoming journeys, all three sensors have an unknown state (`None` internally), while `ROUTES` and `departures` are empty. If the Digitransit request fails, the coordinator marks its entities unavailable instead.
+
+This release retains the existing API key and reauthentication flow from v0.4.0. It is a sensor-focused update; selecting among multiple stops and HFP vehicle tracking are separate future changes.
+
 ## Sensor
 
 Sensor provides real time arrival information of a `route` (bus/tram) if available. If real time info is unavailable, it provides the scheduled arrival time of the `route`. If integration is configured with a `route`, sensor provides arrival times filtered for that `route` only. If the integration is configured without a `route`, it provides arrival times for all `routes` arriving at the given stop, in order of their arrival time. Sensor attributes provide the `Stop Name`, `Stop Code`, `Stop GTFS ID` and a list of upcoming `routes` with their arrival times for the day.
