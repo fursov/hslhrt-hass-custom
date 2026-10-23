@@ -1,21 +1,25 @@
 # hslhrt-hass-custom
-`hslhrt-hass-custom` is a Home Assistant custom component for real time public transsport information in Helsinki Metropoliton Area. Data is provided via [Digitransit platform](https://digitransit.fi/en/) APIs.
+
+Custom Home Assistant integration for HSL public transport stop departures in the Helsinki metropolitan area. Data is provided by [Digitransit](https://digitransit.fi/en/).
+
+> [!WARNING]
+> The legacy integration currently uses Digitransit Routing API v1, which was retired in April 2025. **This repository-layout PR does not restore API functionality.** Routing v2 and API-key authentication are planned for a separate follow-up PR. Do not treat this branch as a working replacement for the legacy integration yet.
 
 ## Installation
 
-    1. Using a tool of choice open the directory (folder) for HA configuration (where you find configuration YAML file).
-    2. If `custom_components` directory does not exist, create one.
-    3. In the `custom_components` directory create a new folder called `hslhrt`.
-    4. Download all the files from the this repository and place the files in this directory.
-    5. If the files are placed correctly, it should have the hierarchy as: <HA configuration directory>/custom_components/hslhrt
-    6. Restart Home Assistant
-    7. Install integration from UI (Configuration --> Intergations --> + --> Search for "hsl")
-    8. Specify stop name (e.g. töölöntori) or stop code (e.g. H0209). Optionally the route number (e.g. 8) or the destination can be specified as well.
-       1. Stop name is case in-sensitive, but stop code is not. E.g. töölöntori and Töölöntori are OK. H0209 is OK. h0209 is NOT OK.
-       2. Route takes precedence over destination, if specified. Both options are case in-sensitive.
-       3. In case, route and destination are not needed, leave the default values as "ALL" or "all".
+### HACS (custom repository)
 
-<br/>
+1. In HACS, open the menu for adding a custom repository.
+2. Enter `https://github.com/fursov/hslhrt-hass-custom` and select **Integration**.
+3. Install the repository, restart Home Assistant, then add **Helsinki Regional Transport** under **Settings → Devices & services**.
+
+### Manual installation
+
+Copy the **contents** of this repository's `custom_components/hslhrt/` directory into `<Home Assistant config>/custom_components/hslhrt/` and restart Home Assistant.
+
+There must be no extra nested `custom_components` folder. The integration is configured through the UI: enter a stop name or public stop code, and optionally a route or destination. `ALL` disables the respective filter. Route selection takes precedence over destination.
+
+The `hacs.json` manifest currently declares Home Assistant **2025.1.0** as the *target minimum version for modernization*. Runtime compatibility has not yet been verified; the old API remains unavailable until PR2.
 
 ## Sensor
 

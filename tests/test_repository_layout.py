@@ -1,0 +1,70 @@
+"""Repository layout and metadata smoke tests (no Home Assistant runtime required)."""
+
+import ast
+import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+INTEGRATION = ROOT / "custom_components" / "hslhrt"
+
+
+def load_json(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_one_hacs_integration_in_standard_layout():
+    assert [path.name for path in (ROOT / "custom_components").iterdir() if path.is_dir()] == [
+        "hslhrt"
+    ]
+    for filename in (
+        "__init__.py",
+        "config_flow.py",
+        "const.py",
+        "sensor.py",
+        "manifest.json",
+        "strings.json",
+        "translations/en.json",
+    ):
+        assert (INTEGRATION / filename).is_file(), filename
+    for filename in ("__init__.py", "config_flow.py", "const.py", "sensor.py", "manifest.json", "strings.json"):
+        assert not (ROOT / filename).exists(), filename
+
+
+def test_manifest_metadata_and_version():
+    manifest = load_json(INTEGRATION / "manifest.json")
+    assert manifest["domain"] == "hslhrt"
+    assert list(manifest) == [
+        "domain",
+        "name",
+        *sorted(key for key in manifest if key not in ("domain", "name")),
+    ]
+    assert manifest["version"] == "0.3.5"
+    assert manifest["config_flow"] is True
+    assert manifest["documentation"].startswith("https://github.com/fursov/")
+    assert manifest["issue_tracker"].startswith("https://github.com/fursov/")
+    assert manifest["codeowners"] == ["@fursov"]
+    assert manifest["requirements"] == ["python_graphql_client==0.4.3"]
+
+
+def test_hacs_metadata():
+    hacs = load_json(ROOT / "hacs.json")
+    assert hacs["name"] == "Helsinki Regional Transport"
+    assert hacs["country"] == "FI"
+    assert hacs["homeassistant"] == "2025.1.0"
+    assert "content_in_root" not in hacs or hacs["content_in_root"] is False
+
+
+def test_translations_match_source_strings():
+    assert load_json(INTEGRATION / "strings.json") == load_json(
+        INTEGRATION / "translations" / "en.json"
+    )
+
+
+def test_config_entry_only_schema_declared():
+    source = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+    assert "CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)" in source
+
+
+def test_python_sources_parse():
+    for source in INTEGRATION.rglob("*.py"):
+        ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
