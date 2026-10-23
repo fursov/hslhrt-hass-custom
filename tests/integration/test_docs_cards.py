@@ -123,6 +123,6 @@ def test_no_live_readme_screenshots_claim_old_images_are_current():
         path = ROOT / "resources" / "images" / name
         assert path.is_file() and path.stat().st_size > 1_000
         raw = path.read_bytes()
-        assert raw.startswith(b"\\xff\\xd8") and raw.endswith(b"\\xff\\xd9")
+        assert raw.startswith(bytes((0xFF, 0xD8))) and raw.endswith(bytes((0xFF, 0xD9)))
         assert name in archive and name not in readme
     assert "not" in archive.lower() and "historical" in archive.lower()
