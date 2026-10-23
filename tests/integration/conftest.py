@@ -10,10 +10,6 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.hslhrt.const import DOMAIN
 
-# Explicit plugin registration supplies the real HA 'hass' and registry fixtures.
-pytest_plugins = ["pytest_homeassistant_custom_component"]
-
-
 @pytest.fixture(autouse=True)
 def enable_hslhrt_custom_integration(enable_custom_integrations):
     """Tell HA's integration loader to search custom_components."""

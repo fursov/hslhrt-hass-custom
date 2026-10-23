@@ -21,7 +21,7 @@ python -m pytest -q tests --ignore=tests/integration
 
 # Real HA integration tests (Python 3.14; separate virtual environment)
 python -m pip install -r requirements-ha-tests.txt
-python -m pytest -q tests/integration
+python -m pytest -q -p pytest_homeassistant_custom_component tests/integration
 ```
 
 The suites must run in **separate Python processes**: existing unit tests
