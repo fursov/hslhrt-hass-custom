@@ -23,6 +23,7 @@ from .const import (
     DICT_KEY_DEST,
     DICT_KEY_ROUTE,
     DOMAIN,
+    HFP_MANAGER,
     MAX_DEPARTURES_ATTRIBUTE,
     MAX_LEGACY_ROUTES,
     STOP_CODE,
@@ -35,14 +36,16 @@ from .schedule import upcoming_departures
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Add the legacy route sensor and two new arrival sensors."""
-    coordinator = hass.data[DOMAIN][config_entry.entry_id][COORDINATOR]
-    async_add_entities(
-        [
-            HSLHRTRouteSensor(coordinator, config_entry),
-            HSLHRTNextArrivalSensor(coordinator, config_entry),
-            HSLHRTMinutesUntilArrivalSensor(coordinator, config_entry),
-        ]
-    )
+    data = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator = data[COORDINATOR]
+    entities = [
+        HSLHRTRouteSensor(coordinator, config_entry),
+        HSLHRTNextArrivalSensor(coordinator, config_entry),
+        HSLHRTMinutesUntilArrivalSensor(coordinator, config_entry),
+    ]
+    if (manager := data.get(HFP_MANAGER)) is not None:
+        entities.append(HSLHRTTrackedVehiclesSensor(coordinator, config_entry, manager))
+    async_add_entities(entities)
 
 
 class HSLHRTBaseSensor(CoordinatorEntity, SensorEntity):
@@ -188,3 +191,51 @@ class HSLHRTMinutesUntilArrivalSensor(HSLHRTBaseSensor):
         return max(
             0, math.ceil((departures[0]["arrival_timestamp"] - now_timestamp) / 60)
         )
+
+
+class HSLHRTTrackedVehiclesSensor(HSLHRTBaseSensor):
+    """Number of upcoming selected journeys with recent, exact GPS matches.
+
+    A compact list of selected journeys is provided even if no GPS is known.
+    Dynamic geo_location entities are intentionally deferred to PR9.
+    """
+
+    _attr_icon = "mdi:map-marker-path"
+    _attr_native_unit_of_measurement = None
+
+    def __init__(self, coordinator, config_entry, manager) -> None:
+        super().__init__(coordinator, config_entry)
+        self._manager = manager
+        self._remove_hfp_listener = None
+        self._attr_name = f"{self._base_name} Tracked vehicles"
+        self._attr_unique_id = f"{self._base_unique_id}_tracked_vehicles"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self._remove_hfp_listener = self._manager.add_listener(
+            self.async_write_ha_state
+        )
+
+    async def async_will_remove_from_hass(self) -> None:
+        if self._remove_hfp_listener:
+            self._remove_hfp_listener()
+            self._remove_hfp_listener = None
+        await super().async_will_remove_from_hass()
+
+    @property
+    def native_value(self) -> int:
+        """Return the number of selected journeys with fresh vehicle GPS."""
+        return sum(
+            row["gps_available"] for row in self._manager.visible()
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Expose bounded per-journey locations and connection diagnostics."""
+        rows = self._manager.visible()
+        return {
+            ATTR_ATTRIBUTION: ATTRIBUTION,
+            "hfp_connected": self._manager.connected,
+            "selected_journeys": len(rows),
+            "vehicles": rows[:32],
+        }

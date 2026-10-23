@@ -113,8 +113,39 @@ def parse_departures(
             arrival_offset = scheduled
         arrival_timestamp = service_day + arrival_offset
         arrival_dt = datetime.fromtimestamp(arrival_timestamp, tz=timezone.utc)
+        # HFP identifies a *journey* by GTFS route ID, direction,
+        # operating day and first-stop scheduled departure. These values
+        # are intentionally separate from the public route number.
+        departure_stoptime = trip.get("departureStoptime") or {}
+        route_gtfs_id = (trip.get("route") or {}).get("gtfsId")
+        direction_id = trip.get("directionId")
+        first_service_day = departure_stoptime.get("serviceDay")
+        first_departure = departure_stoptime.get("scheduledDeparture")
+        if (
+            isinstance(first_service_day, int)
+            and isinstance(first_departure, int)
+            and isinstance(route_gtfs_id, str)
+            and route_gtfs_id.startswith("HSL:")
+            and str(direction_id) in ("0", "1")
+        ):
+            first_start = datetime.fromtimestamp(
+                first_service_day + first_departure, tz=timezone.utc
+            ).astimezone(HELSINKI)
+            operation_day = datetime.fromtimestamp(
+                first_service_day, tz=timezone.utc
+            ).astimezone(HELSINKI).date().isoformat()
+            hfp_route = route_gtfs_id.split(":", 1)[1]
+            hfp_direction = str(int(direction_id) + 1)
+            hfp_start = first_start.strftime("%H:%M")
+        else:
+            hfp_route = hfp_direction = hfp_start = operation_day = None
+
         routes.append(
             {
+                "hfp_route_id": hfp_route,
+                "hfp_direction": hfp_direction,
+                "hfp_start": hfp_start,
+                "hfp_operating_day": operation_day,
                 DICT_KEY_ROUTE: route,
                 DICT_KEY_DEST: destination,
                 DICT_KEY_ARRIVAL: arrival_dt.astimezone(HELSINKI).strftime("%H:%M:%S"),

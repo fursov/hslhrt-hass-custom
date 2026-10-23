@@ -12,6 +12,12 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .client import DigitransitAuthError, DigitransitClient, DigitransitError
 from .const import (
     CONF_API_KEY,
+    CONF_HFP_ENABLED,
+    CONF_HFP_HORIZON,
+    CONF_HFP_PER_ROUTE,
+    DEFAULT_HFP_HORIZON,
+    DEFAULT_HFP_PER_ROUTE,
+    HFP_MANAGER,
     COORDINATOR,
     DOMAIN,
     STOP_GTFS,
@@ -19,6 +25,7 @@ from .const import (
     _LOGGER,
 )
 from .configuration import effective_filters, scan_interval_minutes
+from .hfp import HFPManager
 from .schedule import parse_departures
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -44,13 +51,28 @@ async def async_setup_entry(hass: HomeAssistant, config_entry) -> bool:
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})
+    manager = None
+    if config_entry.options.get(CONF_HFP_ENABLED, False):
+        manager = HFPManager(
+            hass,
+            coordinator,
+            horizon=config_entry.options.get(
+                CONF_HFP_HORIZON, DEFAULT_HFP_HORIZON
+            ),
+            per_route=config_entry.options.get(
+                CONF_HFP_PER_ROUTE, DEFAULT_HFP_PER_ROUTE
+            ),
+        )
     undo_listener = config_entry.add_update_listener(update_listener)
     hass.data[DOMAIN][config_entry.entry_id] = {
         COORDINATOR: coordinator,
         UNDO_UPDATE_LISTENER: undo_listener,
+        HFP_MANAGER: manager,
     }
     try:
         await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
+        if manager is not None:
+            await manager.async_start()
     except Exception:
         undo_listener()
         hass.data[DOMAIN].pop(config_entry.entry_id, None)
@@ -64,6 +86,8 @@ async def async_unload_entry(hass: HomeAssistant, config_entry) -> bool:
         return False
     data = hass.data[DOMAIN].pop(config_entry.entry_id, None)
     if data is not None:
+        if data.get(HFP_MANAGER) is not None:
+            await data[HFP_MANAGER].async_stop()
         data[UNDO_UPDATE_LISTENER]()
     return True
 

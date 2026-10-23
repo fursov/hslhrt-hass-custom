@@ -1,97 +1,99 @@
-# hslhrt-hass-custom
+# Helsinki Regional Transport (HSL HRT)
 
-Custom Home Assistant integration for HSL public transport stops in the Helsinki region, using the [Digitransit Routing v2 GraphQL API](https://digitransit.fi/en/developers/apis/1-routing-api/).
+Home Assistant custom integration for upcoming HSL departures at a selected stop using
+[Digitransit Routing v2](https://digitransit.fi/en/developers/apis/1-routing-api/).
 
-## Digitransit API key
+**Release history:** [CHANGELOG.md](CHANGELOG.md).
 
-Digitransit requires a free subscription key. Register and obtain yours at https://portal-api.digitransit.fi/ . The integration sends it using the `digitransit-subscription-key` header and stores the key in Home Assistant's config entry.
+## Installation
 
-**Upgrading from 0.3.5:** Existing configured stops are retained. After updating, Home Assistant asks you to **Reauthenticate** the integration to add an API key. Do not delete the old stop entries. You can also use **Reconfigure** to rotate a key.
+In HACS, add `https://github.com/fursov/hslhrt-hass-custom` as a custom
+**Integration** repository. Install it, restart Home Assistant, then open
+**Settings → Devices & services** and add **Helsinki Regional Transport**.
 
-## Developer testing (PR7)
+For manual installation, copy `custom_components/hslhrt/` into
+`<HA configuration>/custom_components/hslhrt/` and restart Home Assistant.
 
-PR7 adds a separate suite using the real Home Assistant Core loader, config-entry
-manager, sensors and entity registry. Digitransit network requests are mocked;
-no API key or running Home Assistant server is needed.
+You need a Digitransit API subscription key from
+https://portal-api.digitransit.fi/ . The key is sent in the
+`digitransit-subscription-key` header. Existing configurations imported
+from v0.3.5 require reauthentication but should not be deleted.
 
-```bash
-# Fast tests (Python 3.13; existing lightweight HA stubs)
+## Stop setup and filtering
+
+Enter a stop name, public stop code (`E4971`, `E4972`) or GTFS ID
+(`HSL:...`). Name search shows a selection when multiple platforms are
+returned. The code search verifies the exact stop against Routing v2.
+
+Under **Configure**, select one or more routes and a destination filter
+(`ALL` means all). A nonempty route selection takes precedence over
+destination. The Routing API polling interval can be set to 1, 2, 3, 5, 10,
+15 or 30 minutes. Existing entries keep their original filters until changed.
+
+## Sensors
+
+Each stop/route entry has three standard sensors:
+
+| Sensor | Meaning |
+| --- | --- |
+| Route | Route number of the next arriving bus/tram, with legacy `ROUTE`, `DESTINATION`, `ARRIVAL TIME`, `ROUTES` and stop attributes |
+| Next arrival | Timezone-aware datetime of the next arrival |
+| Minutes until arrival | Rounded-up minutes until the next arrival |
+
+The legacy `ROUTES` attribute excludes the first arrival and is capped at
+20 further departures. The modern `departures` attribute includes the first
+10. These sensors remain available when GPS tracking is disabled or HFP is offline.
+
+## Optional HFP vehicle tracking (v0.7.0)
+
+This release can track **multiple next journeys per route at the configured
+stop**, not just the first bus overall. Open **Configure** and enable
+*Track GPS positions*. Choose a horizon (15–90 minutes, default 30) and a
+maximum number of journeys per public route (1–5, default 2).
+
+Once enabled, an additional **Tracked vehicles** sensor appears:
+
+- Numeric state: number of upcoming journeys with fresh GPS coordinates.
+- `selected_journeys`: number of eligible trips whose GTFS journey identity
+  can be matched to HFP.
+- `vehicles`: bounded list of planned journeys and their GPS when available.
+  Each row includes route, arrival, direction, trip start, operating day and
+  `gps_available`. The `latitude`, `longitude`, speed and heading appear
+  only when the HFP position is fresh.
+- `hfp_connected`: whether the public MQTT broker is currently connected.
+
+Tracking uses TLS with the public `mqtt.hsl.fi:8883` broker, separately from
+your own Home Assistant / Zigbee2MQTT broker. It does **not** require another
+Digitransit API key. No GPS data is fabricated: if there is no matching HFP
+vehicle or the last position is older than 90 seconds, the journey stays in
+the list but `gps_available` is false. The integration limits subscriptions
+to 32 exact route/direction/start combinations per stop. Updates of HA
+entities are throttled to approximately five seconds.
+
+Some timetable journeys lack the GTFS metadata required for exact matching;
+they remain in the original timetable but are omitted from HFP selection.
+GPS points on the native Home Assistant map are planned for PR9.
+
+## Development and tests
+
+Run the lightweight unit tests in a Python 3.13 environment:
+
+```sh
 python -m pip install pytest ruff aiohttp voluptuous
 python -m pytest -q tests --ignore=tests/integration
+```
 
-# Real HA integration tests (Python 3.14; separate virtual environment)
+Run tests against real Home Assistant Core in a separate Python 3.14
+environment (no live HSL calls):
+
+```sh
 python -m pip install -r requirements-ha-tests.txt
 python -m pytest -q -p pytest_homeassistant_custom_component tests/integration
 ```
 
-The suites must run in **separate Python processes**: existing unit tests
-insert stub `homeassistant` modules into `sys.modules`, whereas integration
-tests import real Home Assistant libraries. CI enforces both suites separately.
-
-The integration job uses a pinned HA version and pinned test-fixture plugin,
-and runs on every PR, push to `main`, and weekly. It detects problems such as
-obsolete Home Assistant imports that simple syntax and mocked tests miss.
-
-This PR changes no runtime integration code or manifest version.
-
-## Installation
-
-### HACS (custom repository)
-
-1. Add `https://github.com/fursov/hslhrt-hass-custom` as a **custom Integration** repository in HACS.
-2. Install the integration and restart Home Assistant.
-3. Go to **Settings → Devices & services**, add **Helsinki Regional Transport**, and enter your API key and stop name/code.
-4. Optionally enter a route or destination filter. Use `ALL` for any route/destination; a route takes precedence over destination.
-
-### Manual installation
-
-Copy the files from `custom_components/hslhrt/` in this repository into your Home Assistant configuration directory at `custom_components/hslhrt/`. Restart Home Assistant and configure from **Settings → Devices & services**.
-
-## Notes on v0.4.0
-
-- Migrated from retired Routing v1 to Routing v2.
-- Uses HA's shared asynchronous HTTP session (no standalone GraphQL library).
-- The one-sensor-per-config-entry model and legacy `ROUTE`, `DESTINATION`, `ARRIVAL TIME`, `ROUTES` attributes remain supported.
-- Realtime arrival timestamps are computed from `serviceDay` and the appropriate arrival offset, so journeys across midnight and daylight-saving transitions are handled correctly.
-- Stop name disambiguation is supported beginning with v0.6.0.
-- This version has not been live-tested against Digitransit with a personal API key; tests use fixture responses.
-
-## Fixes (v0.6.1)
-
-- **Public stop code search:** Input such as `E4971`, `E4972`, `H0209` or `Si2223` is now resolved via Digitransit Geocoding, rather than passed to the Routing GraphQL name search. The chosen GTFS stop is always checked against its public code before creating a config entry.
-- **Name search:** Names such as `Eestinmalmintie` still show a stop picker when multiple boarding platforms share the same name.
-- The same Digitransit subscription key is used for both Routing and Geocoding APIs. Ensure that your subscription permits access to Geocoding v1.
-- **No migration:** Existing config entries and entity IDs remain unchanged. This fix affects adding new stops only.
-
-## Configuration improvements (v0.6.0)
-
-- **Stop picker:** Searching by name now offers a dropdown of matching stop platforms, including the public code and GTFS ID, instead of silently taking the first result. Exact stop codes and GTFS IDs skip the picker. The picker shows at most the first 50 valid API results; narrow your search if necessary.
-- **Options:** Open **Settings → Devices & services → Helsinki Regional Transport → Configure** for a configured stop. Select any number of routes, optionally a destination, and a polling interval of 1, 2, 3, 5, 10, 15 or 30 minutes. Leave route selection empty to include all routes. A nonempty route selection takes precedence over the destination filter.
-- **Compatibility:** Existing entries without options keep their original single-route or destination filter and the 1-minute polling interval. Saving Options preserves the config entry and entity unique IDs; the display name may reflect the newly selected routes. Configured options trigger an automatic integration reload.
-- **Rate limits:** One Digitransit timetable query is made per configured stop/route entry at each poll. Reducing polling frequency reduces API requests but also makes arrival predictions and the minute ETA less current.
-
-## Maintenance (v0.5.1)
-
-- Fix loading the configuration flow on recent Home Assistant versions: `ConfigType` is imported from `homeassistant.helpers.typing`, not `homeassistant.core`.
-- No changes to existing configured stops, API keys, sensor IDs or polling behavior.
-
-## Sensors (v0.5.0)
-
-Each configured stop/route creates three sensors:
-
-| Sensor | Example state | Notes |
-| --- | --- | --- |
-| Existing route sensor | `8` | Maintains the original `unique_id` and the legacy `ROUTE`, `DESTINATION`, `ARRIVAL TIME`, and `ROUTES` attributes |
-| Next arrival | `2026-10-23T12:15:00+00:00` | Timestamp sensor (timezone-aware UTC); Home Assistant displays it in the local timezone |
-| Minutes until arrival | `4` | Numeric sensor, unit `min`, updated with the stop's one-minute polling cycle and rounded up |
-
-**Entity IDs:** Home Assistant generates entity IDs from names and its entity registry. Existing entity IDs are not renamed intentionally. The new entity IDs may differ depending on previous installations and user customizations.
-
-The route sensor also exposes a compact `departures` list **including** the next arrival, with route, destination, scheduled/realtime timestamps, and delay in seconds. The existing `ROUTES` attribute still **excludes** the next arrival, consistent with v0.4.0 and the historical implementation. For storage safety, it contains at most **20 subsequent departures**; `departures` contains at most **10 departures**. The original query still requests up to 100 journeys. Expired and cancelled departures are not included.
-
-Stop metadata (`STOP NAME`, `STOP CODE`, `GTFS ID`) is present even if there are no upcoming journeys. If the stop has no upcoming journeys, all three sensors have an unknown state (`None` internally), while `ROUTES` and `departures` are empty. If the Digitransit request fails, the coordinator marks its entities unavailable instead.
-
-This release retains the existing API key and reauthentication flow from v0.4.0. It is a sensor-focused update; selecting among multiple stops and HFP vehicle tracking are separate future changes.
+These must run in **separate processes**, because the fast tests use
+`homeassistant` module stubs. CI runs both suites, Hassfest and HACS.
+The Home Assistant integration-test baseline is pinned for repeatability.
 
 ## Sensor
 
