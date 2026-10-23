@@ -1,0 +1,74 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Helsingin seudun liikenne",
+        "description": "Anna pysäkin nimi tai tunnus ja Digitransitin API-avain. Linkki API-portaaliin löytyy README-tiedostosta.",
+        "data": {
+          "user_name_code": "Pysäkin nimi tai tunnus",
+          "route": "Linja (ALL = kaikki)",
+          "destination": "Määränpää (ALL = kaikki)",
+          "api_key": "Digitransitin API-avain"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Digitransitin API-avain tarvitaan",
+        "description": "Lisää tai vaihda API-avain, jotta pysäkin tiedot päivittyvät jälleen. Rekisteröintiohjeet löytyvät README-tiedostosta.",
+        "data": {
+          "api_key": "Digitransitin API-avain"
+        }
+      },
+      "reconfigure": {
+        "title": "Vaihda Digitransitin API-avain",
+        "description": "Anna valitun pysäkin uusi API-avain.",
+        "data": {
+          "api_key": "Digitransitin API-avain"
+        }
+      },
+      "select_stop": {
+        "title": "Valitse pysäkki",
+        "description": "Haulla löytyi useita pysäkkejä tai pysäkkilaitureita. Valitse oikea pysäkkitunnus.",
+        "data": {
+          "selected_stop": "Pysäkki"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Yhteys Digitransit-palveluun epäonnistui",
+      "invalid_api_key": "Virheellinen Digitransitin API-avain",
+      "invalid_name_code": "Pysäkkiä ei löytynyt annetulla nimellä tai tunnuksella",
+      "invalid_route": "Valittu linja ei liikennöi tällä pysäkillä",
+      "invalid_destination": "Valittua määränpäätä ei löydy tältä pysäkiltä",
+      "unknown": "Odottamaton virhe"
+    },
+    "abort": {
+      "already_configured": "Pysäkki ja linja on jo määritetty",
+      "reauth_successful": "API-avain päivitetty",
+      "reconfigure_successful": "API-avain päivitetty",
+      "missing_stop_selection": "Aloita määritys uudelleen pysäkin hakemiseksi"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Pysäkin asetukset",
+        "description": "Valitse linjat, päivitysväli ja halutessasi seuraavien vuorojen GPS-seuranta. GPS-sijainnit eivät aina ole saatavilla, mutta aikataulut toimivat silti.",
+        "data": {
+          "routes_filter": "Linjat (tyhjä = kaikki)",
+          "destination_filter": "Määränpään suodatin (ALL = kaikki)",
+          "scan_interval": "Päivitysväli (minuuttia)",
+          "track_vehicles": "Seuraa lähestyvien ajoneuvojen GPS-sijainteja (HFP)",
+          "tracking_horizon_minutes": "GPS-seurannan aikajänne (minuuttia)",
+          "tracking_per_route": "Seurattavien vuorojen määrä linjaa kohti"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Linjojen hakeminen Digitransit-palvelusta epäonnistui",
+      "invalid_api_key": "API-avain hylättiin",
+      "invalid_name_code": "Pysäkki ei ole saatavilla",
+      "invalid_route": "Valitse pysäkillä liikennöivä linja",
+      "invalid_selection": "Valitse jokin luettelon arvoista"
+    }
+  }
+}
