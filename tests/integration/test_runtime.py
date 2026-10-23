@@ -157,8 +157,18 @@ async def test_minute_tick_updates_eta_and_next_route_without_extra_api_calls(
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
+    # Registered sensor entities remain as unavailable states after unload.
+    ids = (route_id, arrival_id, eta_id)
+    before_tick = {
+        entity_id: hass.states.get(entity_id).last_updated
+        for entity_id in ids
+    }
+    assert all(hass.states.get(entity_id).state == "unavailable" for entity_id in ids)
     async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=6))
     await hass.async_block_till_done()
-    assert hass.states.get(route_id) is None
-    assert hass.states.get(arrival_id) is None
-    assert hass.states.get(eta_id) is None
+    assert all(hass.states.get(entity_id).state == "unavailable" for entity_id in ids)
+    assert all(
+        hass.states.get(entity_id).last_updated == before_tick[entity_id]
+        for entity_id in ids
+    )
+    assert client.get_departures.await_count == 1
