@@ -5,6 +5,10 @@ are the custom-integration manifest versions, not Home Assistant Core versions.
 
 ## [0.8.0] — Unreleased
 
+- Raised the declared minimum supported Home Assistant Core version in HACS
+  from 2025.1.0 to 2026.10.2, matching the actual integration-test baseline.
+  Earlier Home Assistant versions are no longer advertised as supported.
+
 - Added native Map Card integration via temporary `geo_location` entities,
   one for each selected journey with fresh HFP GPS coordinates.
 - Markers are updated in place and removed after GPS expires, when the

@@ -5,6 +5,15 @@ Home Assistant custom integration for upcoming HSL departures at a selected stop
 
 **Release history:** [CHANGELOG.md](CHANGELOG.md).
 
+## Home Assistant compatibility
+
+**Minimum supported Home Assistant Core: 2026.10.2 (Python 3.14).**
+This is the version used by the real Home Assistant integration test suite
+in GitHub Actions. Earlier Home Assistant versions are not supported by
+the current HSL HRT integration. HACS checks this requirement when installing
+or updating the integration. This compatibility requirement is separate
+from the HSL HRT integration's version number.
+
 ## Installation
 
 In HACS, add `https://github.com/fursov/hslhrt-hass-custom` as a custom
