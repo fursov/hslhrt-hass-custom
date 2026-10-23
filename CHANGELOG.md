@@ -1,0 +1,59 @@
+# Changelog
+
+All notable changes to this HSL HRT integration are recorded here. Versions
+are the custom-integration manifest versions, not Home Assistant Core versions.
+
+## [0.7.0] — Unreleased
+
+- Optional HFP v2 MQTT tracking for multiple upcoming journeys of every
+  selected public route at a configured stop.
+- Per-entry options for tracking horizon and journeys per route; defaults are
+  30 minutes and two journeys per route, with tracking off by default.
+- New tracked-vehicles sensor with exact journey matching, fresh coordinates
+  and connection status. Existing timetable sensors are unaffected by outages.
+- Bounded TLS MQTT subscriptions and position expiration. Native map entities
+  are deferred to the next development phase.
+- Moved change history out of README into this file.
+- Added real Home Assistant integration tests in PR7 (Python 3.14,
+  Home Assistant Core 2026.10.2), leaving older unit tests separate.
+
+## [0.6.1]
+
+- Fixed direct lookup of public HSL stop codes such as E4971 and E4972 by
+  searching Digitransit Geocoding instead of name-only GraphQL lookup.
+- Verified the selected stop's public code against its Routing API details,
+  preventing selection of the opposite-side stop.
+- Preserved name search and the ambiguous-stop picker.
+
+## [0.6.0]
+
+- Added interactive stop selection showing stop code and GTFS ID when multiple
+  stops share a name.
+- Added Options Flow for multiple routes, destination filter and an
+  entry-specific 1–30-minute polling interval.
+- Existing config entries and unique IDs remain compatible.
+
+## [0.5.1]
+
+- Fixed loading config flows on recent Home Assistant versions by replacing
+  the obsolete `homeassistant.core.Config` annotation with `ConfigType`.
+- Added an import regression test.
+
+## [0.5.0]
+
+- Modernized CoordinatorEntity updates and preserved the legacy route sensor.
+- Added timestamp and numeric minutes-until-arrival sensors.
+- Added compact, bounded upcoming departure attributes.
+- Improved filtering of expired and cancelled departures.
+
+## [0.4.0]
+
+- Migrated from retired Digitransit Routing v1 to Routing v2 GraphQL.
+- Switched to asynchronous requests using the shared Home Assistant HTTP session.
+- Added API key configuration and reauthentication for existing entries.
+- Corrected stop-time handling across midnight and daylight-saving transitions.
+
+## [0.3.5 and earlier]
+
+- Legacy version from the original `hslhrt-hass-custom` integration, with
+  one route/stop sensor per configuration entry.
