@@ -2,24 +2,42 @@
   "config": {
     "step": {
       "user": {
-        "description": "HSL-HRT Configuration Parameters",
         "title": "Helsinki Regional Transport",
+        "description": "Enter a stop name or code and your Digitransit API key. See the README for the API portal link.",
         "data": {
-          "user_name_code": "STOP Name / Code",
-          "route": "Route",
-          "destination": "Destination"
+          "user_name_code": "Stop name or code",
+          "route": "Route (ALL for any)",
+          "destination": "Destination (ALL for any)",
+          "api_key": "Digitransit API key"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Digitransit API key required",
+        "description": "Add or replace the API key to resume updates for this stop. See the README for registration instructions.",
+        "data": {
+          "api_key": "Digitransit API key"
+        }
+      },
+      "reconfigure": {
+        "title": "Change Digitransit API key",
+        "description": "Enter a replacement API key for the selected stop.",
+        "data": {
+          "api_key": "Digitransit API key"
         }
       }
     },
     "error": {
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "cannot_connect": "Unable to connect to Digitransit",
+      "invalid_api_key": "Invalid Digitransit API key",
+      "invalid_name_code": "Stop name or code was not found",
+      "invalid_route": "Route is not available at this stop",
+      "invalid_destination": "Destination is not available at this stop",
+      "unknown": "Unexpected error"
     },
     "abort": {
-      "already_configured": "Already configured stop/route",
-      "invalid_name_code": "Stop Name or Stop Code is invalid!",
-      "invalid_route": "Route is invalid!",
-      "invalid_destination": "Destination is invalid!"
+      "already_configured": "Stop and route already configured",
+      "reauth_successful": "API key updated",
+      "reconfigure_successful": "API key updated"
     }
   }
 }

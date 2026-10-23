@@ -1,25 +1,34 @@
 # hslhrt-hass-custom
 
-Custom Home Assistant integration for HSL public transport stop departures in the Helsinki metropolitan area. Data is provided by [Digitransit](https://digitransit.fi/en/).
+Custom Home Assistant integration for HSL public transport stops in the Helsinki region, using the [Digitransit Routing v2 GraphQL API](https://digitransit.fi/en/developers/apis/1-routing-api/).
 
-> [!WARNING]
-> The legacy integration currently uses Digitransit Routing API v1, which was retired in April 2025. **This repository-layout PR does not restore API functionality.** Routing v2 and API-key authentication are planned for a separate follow-up PR. Do not treat this branch as a working replacement for the legacy integration yet.
+## Digitransit API key
+
+Digitransit requires a free subscription key. Register and obtain yours at https://portal-api.digitransit.fi/ . The integration sends it using the `digitransit-subscription-key` header and stores the key in Home Assistant's config entry.
+
+**Upgrading from 0.3.5:** Existing configured stops are retained. After updating, Home Assistant asks you to **Reauthenticate** the integration to add an API key. Do not delete the old stop entries. You can also use **Reconfigure** to rotate a key.
 
 ## Installation
 
 ### HACS (custom repository)
 
-1. In HACS, open the menu for adding a custom repository.
-2. Enter `https://github.com/fursov/hslhrt-hass-custom` and select **Integration**.
-3. Install the repository, restart Home Assistant, then add **Helsinki Regional Transport** under **Settings → Devices & services**.
+1. Add `https://github.com/fursov/hslhrt-hass-custom` as a **custom Integration** repository in HACS.
+2. Install the integration and restart Home Assistant.
+3. Go to **Settings → Devices & services**, add **Helsinki Regional Transport**, and enter your API key and stop name/code.
+4. Optionally enter a route or destination filter. Use `ALL` for any route/destination; a route takes precedence over destination.
 
 ### Manual installation
 
-Copy the **contents** of this repository's `custom_components/hslhrt/` directory into `<Home Assistant config>/custom_components/hslhrt/` and restart Home Assistant.
+Copy the files from `custom_components/hslhrt/` in this repository into your Home Assistant configuration directory at `custom_components/hslhrt/`. Restart Home Assistant and configure from **Settings → Devices & services**.
 
-There must be no extra nested `custom_components` folder. The integration is configured through the UI: enter a stop name or public stop code, and optionally a route or destination. `ALL` disables the respective filter. Route selection takes precedence over destination.
+## Notes on v0.4.0
 
-The `hacs.json` manifest currently declares Home Assistant **2025.1.0** as the *target minimum version for modernization*. Runtime compatibility has not yet been verified; the old API remains unavailable until PR2.
+- Migrated from retired Routing v1 to Routing v2.
+- Uses HA's shared asynchronous HTTP session (no standalone GraphQL library).
+- The one-sensor-per-config-entry model and legacy `ROUTE`, `DESTINATION`, `ARRIVAL TIME`, `ROUTES` attributes remain supported.
+- Realtime arrival timestamps are computed from `serviceDay` and the appropriate arrival offset, so journeys across midnight and daylight-saving transitions are handled correctly.
+- Initial stop selection uses the first search result when no exact stop code/name matches; an improved interactive stop picker is planned for a later PR.
+- This version has not been live-tested against Digitransit with a personal API key; tests use fixture responses.
 
 ## Sensor
 
