@@ -126,3 +126,31 @@ def test_no_live_readme_screenshots_claim_old_images_are_current():
         assert raw.startswith(bytes((0xFF, 0xD8))) and raw.endswith(bytes((0xFF, 0xD9)))
         assert name in archive and name not in readme
     assert "not" in archive.lower() and "historical" in archive.lower()
+
+
+@pytest.mark.asyncio
+async def test_flow_field_labels_are_available_in_ha_english_translations(hass):
+    """Every field in the user screenshots has an actual localized label."""
+    from homeassistant.helpers.translation import async_get_translations
+
+    for section, expected in {
+        "config": {
+            "component.hslhrt.config.step.user.data.user_name_code":
+                "Stop name or code",
+            "component.hslhrt.config.step.select_stop.data.selected_stop":
+                "Stop",
+        },
+        "options": {
+            "component.hslhrt.options.step.init.data.routes_filter":
+                "Routes (empty = all)",
+            "component.hslhrt.options.step.init.data.track_vehicles":
+                "Track GPS positions of upcoming vehicles (HFP)",
+            "component.hslhrt.options.step.init.data.tracking_horizon_minutes":
+                "GPS tracking lookahead (minutes)",
+            "component.hslhrt.options.step.init.data.tracking_per_route":
+                "Upcoming trips to track per route",
+        },
+    }.items():
+        translations = await async_get_translations(hass, "en", section, {"hslhrt"})
+        for key, expected_label in expected.items():
+            assert translations.get(key) == expected_label, key
