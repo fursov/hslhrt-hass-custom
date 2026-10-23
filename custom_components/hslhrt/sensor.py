@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.const import ATTR_ATTRIBUTION, UnitOfTime
+from homeassistant.core import callback
+from homeassistant.helpers.event import async_track_utc_time_change
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
@@ -80,7 +82,29 @@ class HSLHRTBaseSensor(CoordinatorEntity, SensorEntity):
         return upcoming_departures(self.coordinator.data, time.time())
 
 
-class HSLHRTRouteSensor(HSLHRTBaseSensor):
+class HSLHRTLocallyUpdatedSensor(HSLHRTBaseSensor):
+    """Refresh the current timetable locally every minute, without polling.
+
+    Home Assistant's coordinator remains the only source of network updates;
+    this timer merely expires already-known arrivals and updates the ETA.
+    """
+
+    async def async_added_to_hass(self) -> None:
+        """Start a minute-boundary timer only for active sensor entities."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_utc_time_change(
+                self.hass, self._async_local_time_changed, second=0
+            )
+        )
+
+    @callback
+    def _async_local_time_changed(self, _now: datetime) -> None:
+        """Re-evaluate state and legacy timetable attributes at local time."""
+        self.async_write_ha_state()
+
+
+class HSLHRTRouteSensor(HSLHRTLocallyUpdatedSensor):
     """Legacy text state: number of the next arriving route."""
 
     _attr_icon = "mdi:bus"
@@ -92,7 +116,7 @@ class HSLHRTRouteSensor(HSLHRTBaseSensor):
 
     @property
     def native_value(self) -> str | None:
-        """Return the route number, updated on each coordinator refresh."""
+        """Return the next unexpired route, also updated by the minute timer."""
         departures = self._upcoming()
         return departures[0][DICT_KEY_ROUTE] if departures else None
 
@@ -148,7 +172,7 @@ class HSLHRTRouteSensor(HSLHRTBaseSensor):
         return attributes
 
 
-class HSLHRTNextArrivalSensor(HSLHRTBaseSensor):
+class HSLHRTNextArrivalSensor(HSLHRTLocallyUpdatedSensor):
     """Timestamp of the next scheduled or real-time arrival."""
 
     _attr_device_class = SensorDeviceClass.TIMESTAMP
@@ -170,7 +194,7 @@ class HSLHRTNextArrivalSensor(HSLHRTBaseSensor):
         )
 
 
-class HSLHRTMinutesUntilArrivalSensor(HSLHRTBaseSensor):
+class HSLHRTMinutesUntilArrivalSensor(HSLHRTLocallyUpdatedSensor):
     """Rounded-up number of minutes until the next arrival."""
 
     _attr_icon = "mdi:timer-outline"
@@ -183,7 +207,7 @@ class HSLHRTMinutesUntilArrivalSensor(HSLHRTBaseSensor):
 
     @property
     def native_value(self) -> int | None:
-        """Return the remaining whole minutes, updated every API poll."""
+        """Return the remaining whole minutes, refreshed every local minute."""
         now_timestamp = time.time()
         departures = upcoming_departures(self.coordinator.data, now_timestamp)
         if not departures:
@@ -197,7 +221,7 @@ class HSLHRTTrackedVehiclesSensor(HSLHRTBaseSensor):
     """Number of upcoming selected journeys with recent, exact GPS matches.
 
     A compact list of selected journeys is provided even if no GPS is known.
-    Dynamic geo_location entities are intentionally deferred to PR9.
+    Geolocation entities are maintained by their separate platform.
     """
 
     _attr_icon = "mdi:map-marker-path"
