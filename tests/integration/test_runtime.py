@@ -122,6 +122,11 @@ async def test_minute_tick_updates_eta_and_next_route_without_extra_api_calls(
     old = coordinator.data["routes"][0]
     old["arrival_timestamp"] = time.time() - 15
     new = parse_departures(stop_response(route="2"))["routes"][0]
+    # The later route has a distinct ETA, so we verify timestamp rollover.
+    new["arrival_timestamp"] -= 60
+    new["arrival_datetime"] = datetime.fromtimestamp(
+        new["arrival_timestamp"], tz=timezone.utc
+    ).isoformat()
     coordinator.data["routes"].append(new)
     assert hass.states.get(route_id).state == "8"  # no coordinator push
     previous_arrival = hass.states.get(arrival_id).state
