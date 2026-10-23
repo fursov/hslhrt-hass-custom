@@ -58,7 +58,7 @@ def test_hacs_metadata():
     assert hacs["country"] == "FI"
     assert hacs["homeassistant"] == "2026.10.2"
     requirements = (ROOT / "requirements-ha-tests.txt").read_text(encoding="utf-8")
-    pinned = re.search(r"^homeassistant==([^\\s]+)$", requirements, re.MULTILINE)
+    pinned = re.search(r"^homeassistant==([0-9.]+)$", requirements, re.MULTILINE)
     assert pinned is not None
     # Never advertise a minimum HA version older than the tested baseline.
     assert hacs["homeassistant"] == pinned.group(1)
