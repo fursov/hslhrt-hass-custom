@@ -31,13 +31,39 @@ def sensors(monkeypatch):
     helpers = types.ModuleType("homeassistant.helpers")
     helpers.__path__ = []
     coordinator_api = types.ModuleType("homeassistant.helpers.update_coordinator")
+    core = types.ModuleType("homeassistant.core")
+    core.callback = lambda func: func
+    events = types.ModuleType("homeassistant.helpers.event")
+    listeners = []
+    cancelled = []
+
+    def fake_track_time_change(hass, callback, *, second):
+        assert second == 0
+        listeners.append(callback)
+
+        def unsubscribe():
+            cancelled.append(callback)
+            listeners.remove(callback)
+
+        return unsubscribe
+
+    events.async_track_utc_time_change = fake_track_time_change
 
     class SensorEntity:
-        pass
+        def async_on_remove(self, remove_callback):
+            if not hasattr(self, "_remove_callbacks"):
+                self._remove_callbacks = []
+            self._remove_callbacks.append(remove_callback)
+
+        def async_write_ha_state(self):
+            self._writes = getattr(self, "_writes", 0) + 1
 
     class CoordinatorEntity:
         def __init__(self, coordinator):
             self.coordinator = coordinator
+
+        async def async_added_to_hass(self):
+            pass
 
     class SensorDeviceClass:
         TIMESTAMP = "timestamp"
@@ -56,6 +82,8 @@ def sensors(monkeypatch):
         ("homeassistant.components", components),
         ("homeassistant.components.sensor", sensor_api),
         ("homeassistant.const", constants),
+        ("homeassistant.core", core),
+        ("homeassistant.helpers.event", events),
         ("homeassistant.helpers", helpers),
         ("homeassistant.helpers.update_coordinator", coordinator_api),
     ):
@@ -66,6 +94,8 @@ def sensors(monkeypatch):
     monkeypatch.setitem(sys.modules, "hslhrt.sensor", module)
     spec.loader.exec_module(module)
     monkeypatch.setattr(module.time, "time", lambda: NOW)
+    module._test_minute_callbacks = listeners
+    module._test_cancelled_callbacks = cancelled
     return module
 
 
@@ -188,3 +218,44 @@ def test_options_change_name_without_changing_entity_identity(sensors):
     )
     assert entity._attr_unique_id == "HSL:1000 8"
     assert entity._attr_name == "Töölöntori(H1000) 2, 8"
+
+
+def test_local_minute_timer_updates_three_sensors_and_cleans_up(sensors):
+    """No coordinator or network refresh is needed to advance existing data."""
+    co = coordinator([trip(NOW + 121, "8"), trip(NOW + 240, "2")])
+    classes = (
+        sensors.HSLHRTRouteSensor,
+        sensors.HSLHRTNextArrivalSensor,
+        sensors.HSLHRTMinutesUntilArrivalSensor,
+    )
+    instances = [cls(co, config_entry()) for cls in classes]
+    for entity in instances:
+        entity.hass = SimpleNamespace()
+        asyncio.run(entity.async_added_to_hass())
+    assert len(sensors._test_minute_callbacks) == 3
+    assert instances[0].native_value == "8"
+    co.data["routes"][0]["arrival_timestamp"] = NOW - 1
+    for listener in list(sensors._test_minute_callbacks):
+        listener(datetime.fromtimestamp(NOW + 180, timezone.utc))
+    assert all(entity._writes == 1 for entity in instances)
+    assert instances[0].native_value == "2"
+    assert instances[1].native_value == datetime.fromtimestamp(
+        NOW + 240, timezone.utc
+    )
+    assert instances[2].native_value == 4
+    for entity in instances:
+        for remove in entity._remove_callbacks:
+            remove()
+    assert not sensors._test_minute_callbacks
+    assert len(sensors._test_cancelled_callbacks) == 3
+
+
+def test_tracked_vehicles_sensor_does_not_get_minute_timer(sensors):
+    """HFP has its own GPS freshness timer, not the local timetable timer."""
+    manager = SimpleNamespace(add_listener=lambda callback: lambda: None)
+    entity = sensors.HSLHRTTrackedVehiclesSensor(
+        coordinator([]), config_entry(), manager
+    )
+    entity.hass = SimpleNamespace()
+    asyncio.run(entity.async_added_to_hass())
+    assert sensors._test_minute_callbacks == []

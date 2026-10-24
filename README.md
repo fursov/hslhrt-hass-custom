@@ -81,7 +81,8 @@ Each stop/route entry has three standard sensors:
 
 The legacy `ROUTES` attribute excludes the first arrival and is capped at
 20 further departures. The modern `departures` attribute includes the first
-10. These sensors remain available when GPS tracking is disabled or HFP is offline.
+10. Both attributes are refreshed locally every minute as arrivals expire.
+These sensors remain available when GPS tracking is disabled or HFP is offline.
 
 <details>
 <summary>Show an example of the route sensor's History view</summary>
@@ -206,8 +207,14 @@ entities:
 ```
 
 The next-arrival sensor has Home Assistant's timestamp device class; it
-already handles day boundaries and local-time presentation. The minutes sensor
-updates on each Digitransit poll (every 1–30 minutes according to Options).
+already handles day boundaries and local-time presentation. All three timetable
+sensors (next route, next arrival and remaining minutes) are **re-evaluated
+locally at each minute boundary** using the most recently fetched departures.
+Expired trips disappear and the next known trip becomes active even between
+Digitransit polls. The configured polling interval (1–30 minutes) still
+controls **only** HTTP requests to Digitransit, not these local updates.
+No extra API calls or HFP MQTT operations are made by the minute timer. When
+all fetched departures expire, values become unknown until new data arrives.
 
 ### 2. Route and stop details (Entities Card)
 

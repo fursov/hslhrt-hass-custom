@@ -5,6 +5,15 @@ are the custom-integration manifest versions, not Home Assistant Core versions.
 
 ## [0.9.0] — Unreleased
 
+- Refresh route, next-arrival timestamp and minutes-until-arrival sensors
+  locally on each UTC minute boundary, without extra Digitransit requests
+  or HFP MQTT changes.
+- Automatically advance to the next already-fetched departure when a bus
+  arrives, and clear stale timetable states and attributes once all known
+  departures expire, even with a 30-minute API polling interval.
+- Register minute timers only for active timetable entities and clean them
+  up on removal; added unit and real HA tests.
+
 - Added configured-stop map markers through the separate `hslhrt_stops`
   geolocation source, with `mdi:circle-small` icons and stop name/code details.
 - Digitransit stop `lat`/`lon` are retrieved in the existing Routing v2
