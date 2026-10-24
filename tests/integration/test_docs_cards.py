@@ -226,3 +226,21 @@ async def test_finnish_flow_translations_load_in_real_home_assistant(hass):
         translated = await async_get_translations(hass, "fi", section, {"hslhrt"})
         for key, label in expected.items():
             assert translated.get(key) == label, key
+
+
+
+def test_stop_marker_experiments_document_supported_map_controls():
+    """Do not accidentally recommend active zones as a default integration mode."""
+    source = (ROOT / "docs" / "stop-marker-experiments.md").read_text(
+        encoding="utf-8"
+    )
+    assert "docs/stop-marker-experiments.md" in (
+        ROOT / "README.md"
+    ).read_text(encoding="utf-8")
+    assert "cluster: false" in source
+    assert "cluster_markers: false" in source
+    assert "source: hslhrt_stops" in source
+    assert "Passive zones" in source
+    assert "presence tracking" in source
+    assert "geo_location_sources" in source
+    assert "Do not" in source or "do not" in source
