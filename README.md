@@ -358,6 +358,12 @@ The built-in Map Card does not render separate icon-and-text controls in the
 same marker; `marker_label` is a simple combined text alternative. Stop
 markers use `label_mode: icon` with the `mdi:circle-small` icon.
 
+If nearby stops cluster into a double marker when zooming out, use
+`cluster: false` on this Map Card. This applies to **both** stop and
+vehicle markers. It prevents grouping, but does **not** make the markers
+smaller. See [stop marker experiments](docs/stop-marker-experiments.md)
+for two alternative visual approaches and their limitations.
+
 Markers are temporary; they disappear if GPS ages beyond 90 seconds or
 a journey is no longer selected. A blank map does not mean timetable sensors
 are broken. No extra MQTT integration in Home Assistant is required.
