@@ -165,3 +165,64 @@ def test_stop_coordinates_survive_empty_departure_list():
     assert parsed["stop_latitude"] == 60.205
     assert parsed["stop_longitude"] == 24.9
     assert parsed["routes"] == []
+
+
+
+def test_stop_map_more_info_departures_respect_limit_time_and_filters():
+    """Map More Info rows are ordered, bounded and human-readable."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    helsinki = ZoneInfo("Europe/Helsinki")
+    now = datetime(2026, 10, 24, 23, 55, tzinfo=helsinki).timestamp()
+    t1 = datetime(2026, 10, 24, 23, 58, tzinfo=helsinki).timestamp()
+    t2 = datetime(2026, 10, 25, 0, 4, tzinfo=helsinki).timestamp()
+    data = {"routes": [
+        {"route": "8", "destination": "Kamppi", "arrival_timestamp": t2},
+        {"route": "2", "destination": "Espoo", "arrival_timestamp": now - 10},
+        {"route": "530", "destination": "Matinkylä", "arrival_timestamp": t1},
+    ]}
+    assert schedule.stop_map_departure_attributes(data, now, 2) == {
+        "upcoming_departures_count": 2,
+        "next_departure_1": "23:58 · 530 → Matinkylä",
+        "next_departure_2": "25.10 00:04 · 8 → Kamppi",
+    }
+    assert schedule.stop_map_departure_attributes(data, t1 + 1, 1) == {
+        "upcoming_departures_count": 1,
+        "next_departure_1": "25.10 00:04 · 8 → Kamppi",
+    }
+    assert schedule.stop_map_departure_attributes(data, t2 + 1, 5) == {
+        "upcoming_departures_count": 0,
+    }
+
+
+@pytest.mark.parametrize("invalid_limit", [0, -1, 11, True, "7", None])
+def test_stop_map_departure_limit_is_bounded(invalid_limit):
+    epoch = 1792702800
+    data = {"routes": [
+        {"route": str(i), "destination": "X", "arrival_timestamp": epoch + 60 + i}
+        for i in range(11)
+    ]}
+    result = schedule.stop_map_departure_attributes(data, epoch, invalid_limit)
+    assert result["upcoming_departures_count"] == 5
+    assert "next_departure_5" in result
+    assert "next_departure_6" not in result
+
+
+def test_stop_map_timetable_keeps_dst_fold_distinct():
+    """Epoch timestamps distinguish two real instances of 03:30 during DST."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo("Europe/Helsinki")
+    first = datetime(2026, 10, 25, 3, 30, fold=0, tzinfo=tz).timestamp()
+    second = datetime(2026, 10, 25, 3, 30, fold=1, tzinfo=tz).timestamp()
+    assert second - first == 3600
+    data = {"routes": [
+        {"route": "A", "destination": "First", "arrival_timestamp": first},
+        {"route": "B", "destination": "Second", "arrival_timestamp": second},
+    ]}
+    attrs = schedule.stop_map_departure_attributes(data, first - 60, 5)
+    assert attrs["upcoming_departures_count"] == 2
+    assert attrs["next_departure_1"] == "03:30 · A → First"
+    assert attrs["next_departure_2"] == "03:30 · B → Second"

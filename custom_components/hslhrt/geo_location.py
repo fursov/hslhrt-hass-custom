@@ -8,15 +8,20 @@ Neither location type enters the permanent entity registry.
 import asyncio
 import hashlib
 import math
+import time
 from collections.abc import Callable
 
 from homeassistant.components.geo_location import GeolocationEvent
 from homeassistant.const import ATTR_ATTRIBUTION, UnitOfLength
+from homeassistant.core import callback
+from homeassistant.helpers.event import async_track_utc_time_change
 from homeassistant.util.location import distance as distance_meters
 
 from .const import (
     ATTRIBUTION,
     COORDINATOR,
+    CONF_MAP_STOP_DEPARTURES,
+    DEFAULT_MAP_STOP_DEPARTURES,
     DOMAIN,
     GEO_LOCATION_CONTROLLER,
     HFP_MANAGER,
@@ -24,6 +29,7 @@ from .const import (
     STOP_GTFS,
     STOP_NAME,
 )
+from .schedule import stop_map_departure_attributes
 from .vehicle import marker_label, vehicle_icon
 
 SOURCE = DOMAIN
@@ -109,8 +115,14 @@ class HSLHRTStopLocation(GeolocationEvent):
     _attr_icon = "mdi:circle-small"
     _attr_unit_of_measurement = UnitOfLength.KILOMETERS
 
-    def __init__(self, hass, entry, coords: tuple[float, float]) -> None:
+    def __init__(
+        self, hass, entry, coords: tuple[float, float], coordinator
+    ) -> None:
         self._hass_ref = hass
+        self._coordinator = coordinator
+        self._departures_limit = entry.options.get(
+            CONF_MAP_STOP_DEPARTURES, DEFAULT_MAP_STOP_DEPARTURES
+        )
         self._latitude, self._longitude = coords
         self._stop_name = entry.data.get(STOP_NAME, "")
         self._stop_code = entry.data.get(STOP_CODE, "")
@@ -144,7 +156,30 @@ class HSLHRTStopLocation(GeolocationEvent):
             "stop_name": self._stop_name,
             "stop_code": self._stop_code,
             "stop_gtfs": self._stop_gtfs,
+            **stop_map_departure_attributes(
+                self._coordinator.data, time.time(), self._departures_limit
+            ),
         }
+
+    async def async_added_to_hass(self) -> None:
+        """Keep More Info current even between Digitransit API polls."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            self._coordinator.async_add_listener(self._on_timetable_update)
+        )
+        self.async_on_remove(
+            async_track_utc_time_change(
+                self.hass, self._on_minute_tick, second=0
+            )
+        )
+
+    @callback
+    def _on_timetable_update(self) -> None:
+        self.async_write_ha_state()
+
+    @callback
+    def _on_minute_tick(self, _now) -> None:
+        self.async_write_ha_state()
 
     def update_location(self, coords: tuple[float, float]) -> None:
         if coords == (self._latitude, self._longitude):
@@ -287,7 +322,7 @@ class HSLHRTMapController:
             elif coords is not None:
                 if self._stop_entity is None:
                     self._stop_entity = HSLHRTStopLocation(
-                        self._hass, self._entry, coords
+                        self._hass, self._entry, coords, self._coordinator
                     )
                     self._async_add_entities([self._stop_entity])
                 else:

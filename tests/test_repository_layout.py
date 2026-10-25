@@ -46,7 +46,7 @@ def test_manifest_metadata_and_version():
         "name",
         *sorted(key for key in manifest if key not in ("domain", "name")),
     ]
-    assert manifest["version"] == "0.9.0"
+    assert manifest["version"] == "0.9.1"
     assert manifest["config_flow"] is True
     assert manifest["documentation"].startswith("https://github.com/fursov/")
     assert manifest["issue_tracker"].startswith("https://github.com/fursov/")
@@ -117,8 +117,9 @@ def test_release_090_documents_previous_tag_mismatch():
         ROOT / "docs" / "releases" / "v0.9.0.md"
     ).read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0"
-    assert "## [0.9.0] — Pending release" in changelog
+    assert manifest["version"] == "0.9.1"
+    assert "## [0.9.0] — 2026-10-25" in changelog
+    assert "## [0.9.1] — Unreleased" in changelog
     assert "## [0.8.2] — 2026-10-23" in changelog
     assert "Historical version mismatch" in changelog
     assert "56b30a1" in changelog

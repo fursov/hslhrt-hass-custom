@@ -52,6 +52,11 @@ For compact setup, the GPS tracking lookahead (15–90 minutes) and number of
 journeys per route (1–5) are **drop-down selectors**, rather than long radio
 lists. Tracking is optional and disabled by default.
 
+The **Upcoming departures shown when tapping a map stop** preference
+is configured separately for each stop entry (1–10, default **5**).
+It controls how many departures appear in the stop marker's More Info
+dialog. No extra Digitransit API requests are needed.
+
 <details>
 <summary>Show current compact Options Flow (Home Assistant 2026.10)</summary>
 
@@ -167,6 +172,20 @@ arbitrarily sized dot. Since they are real geolocation entities, configured
 stops may also show automatically on the built-in Map dashboard; no changes
 are made to that dashboard's configuration. Separate entries for the same
 physical stop can overlap or be grouped by the map.
+
+Tapping a configured-stop marker in `ha-map-card` (using its default
+`tap_action: more-info`) opens Home Assistant's standard More Info dialog.
+The marker exposes `next_departure_1` through `next_departure_N`,
+with local Helsinki arrival time, route and destination; `N` is the
+per-stop **Upcoming departures shown when tapping a map stop** preference.
+The default is 5 (configurable from 1 to 10 under **Configure**).
+For example, an attribute may read `16:58 · 530 → Matinkylä`. When
+a departure is on a later local date, the day/month is also displayed.
+These are the **next arrivals after applying that entry's route and
+destination filters**, not necessarily all routes serving a physical stop.
+Only already-fetched departures are shown, with local minute-boundary
+updates; expired entries disappear even between API polls. The dialog
+displays attributes, not a custom table or popup card.
 
 Vehicle markers **update in place** as new coordinates arrive and are completely
 removed when their journey leaves the selected horizon, the GPS becomes stale,

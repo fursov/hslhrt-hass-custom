@@ -59,7 +59,8 @@
           "scan_interval": "Päivitysväli (minuuttia)",
           "track_vehicles": "Seuraa lähestyvien ajoneuvojen GPS-sijainteja (HFP)",
           "tracking_horizon_minutes": "GPS-seurannan aikajänne (minuuttia)",
-          "tracking_per_route": "Seurattavien vuorojen määrä linjaa kohti"
+          "tracking_per_route": "Seurattavien vuorojen määrä linjaa kohti",
+          "map_stop_departures": "Karttapysäkin seuraavat lähdöt (määrä)"
         }
       }
     },

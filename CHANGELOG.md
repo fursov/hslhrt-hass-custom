@@ -5,7 +5,19 @@ Versions refer to GitHub release tags, not Home Assistant Core versions.
 The integration manifest normally matches the release tag; the historical
 exception for `v0.8.2` is documented below.
 
-## [0.9.0] — Pending release
+## [0.9.1] — Unreleased
+
+- Display configurable upcoming arrivals on each stop's standard Map
+  More Info dialog: 1–10 entries per configuration, default 5, as
+  `next_departure_1`…`next_departure_N` attributes with local arrival
+  time, route and destination.
+- Reuse the already-filtered Digitransit coordinator data without additional
+  HTTP requests; refresh attributes each minute and on timetable updates,
+  removing expired journeys. Preserve entity identities and GPS behavior.
+- Localized options in English and Finnish, bounds validation, real HA
+  regression tests and DST-aware timestamp formatting.
+
+## [0.9.0] — 2026-10-25
 
 - Refresh route, next-arrival timestamp and minutes-until-arrival sensors
   locally on each UTC minute boundary, without extra Digitransit requests
@@ -21,8 +33,8 @@ exception for `v0.8.2` is documented below.
 > **Historical version mismatch:** GitHub tag `v0.8.2` points to commit
 > `56b30a1`, where `custom_components/hslhrt/manifest.json` already
 > declared version `0.9.0`. This was published as `v0.8.2`; do not
-> rewrite the tag. The next GitHub release should use the matching
-> `v0.9.0` tag on the final release commit.
+> rewrite the tag. The subsequent `v0.9.0` release restored
+> the correspondence between GitHub tag and manifest version.
 
 - Added configured-stop map markers through the separate `hslhrt_stops`
   geolocation source, with `mdi:circle-small` icons and stop name/code details
