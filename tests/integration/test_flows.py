@@ -106,6 +106,7 @@ async def test_compact_hfp_options_use_real_ha_dropdown_and_store_ints(
     for field, old_value, expected_options in (
         ("tracking_horizon_minutes", "45", ["15", "30", "45", "60", "90"]),
         ("tracking_per_route", "3", ["1", "2", "3", "4", "5"]),
+        ("map_stop_departures", "5", [str(i) for i in range(1, 11)]),
     ):
         default, validator = fields[field]
         assert default == old_value
@@ -122,11 +123,57 @@ async def test_compact_hfp_options_use_real_ha_dropdown_and_store_ints(
             "track_vehicles": True,
             "tracking_horizon_minutes": "60",
             "tracking_per_route": "4",
+            "map_stop_departures": "7",
         },
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options["tracking_horizon_minutes"] == 60
     assert entry.options["tracking_per_route"] == 4
+    assert entry.options["map_stop_departures"] == 7
+    assert type(entry.options["map_stop_departures"]) is int
     assert type(entry.options["tracking_horizon_minutes"]) is int
     assert type(entry.options["tracking_per_route"]) is int
+    assert entry.unique_id == "HSL:1000 8"
+
+
+
+@pytest.mark.asyncio
+async def test_stop_map_departure_options_validate_and_default(
+    hass, make_entry, mock_digitransit
+):
+    """Old entries default to five departures; invalid new values are rejected."""
+    entry = make_entry()
+    entry.add_to_hass(hass)
+    first = await hass.config_entries.options.async_init(entry.entry_id)
+    assert first["type"] is FlowResultType.FORM
+    fields = {
+        key.schema: key.default()
+        for key in first["data_schema"].schema
+    }
+    assert fields["map_stop_departures"] == "5"
+
+    invalid = await hass.config_entries.options.async_configure(
+        first["flow_id"],
+        user_input={
+            "routes_filter": ["8"],
+            "destination_filter": "ALL",
+            "scan_interval": 5,
+            "map_stop_departures": "11",
+        },
+    )
+    assert invalid["type"] is FlowResultType.FORM
+    assert invalid["errors"] == {"map_stop_departures": "invalid_selection"}
+    assert entry.options == {}
+
+    saved = await hass.config_entries.options.async_configure(
+        invalid["flow_id"],
+        user_input={
+            "routes_filter": ["8"],
+            "destination_filter": "ALL",
+            "scan_interval": 5,
+            "map_stop_departures": "3",
+        },
+    )
+    assert saved["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options["map_stop_departures"] == 3
     assert entry.unique_id == "HSL:1000 8"

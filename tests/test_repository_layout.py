@@ -118,7 +118,8 @@ def test_release_090_documents_previous_tag_mismatch():
     ).read_text(encoding="utf-8")
 
     assert manifest["version"] == "0.9.0"
-    assert "## [0.9.0] — Pending release" in changelog
+    assert "## [0.9.0] — 2026-10-25" in changelog
+    assert "## [0.9.1] — Unreleased" in changelog
     assert "## [0.8.2] — 2026-10-23" in changelog
     assert "Historical version mismatch" in changelog
     assert "56b30a1" in changelog

@@ -1,11 +1,14 @@
 """Map lifecycle tests against real Home Assistant geo_location entities."""
 
 import time
+from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from custom_components.hslhrt.const import DOMAIN, HFP_MANAGER
 from custom_components.hslhrt.geo_location import (
@@ -280,3 +283,63 @@ def test_valid_stop_position():
     assert stop_coordinates({"stop_latitude": 60.21, "stop_longitude": 24.86}) == (
         60.21, 24.86
     )
+
+
+
+@pytest.mark.asyncio
+async def test_stop_more_info_configured_departures_refresh_without_extra_api(
+    hass, make_entry, mock_digitransit, stop_response
+):
+    """The marker shows the selected N trips, and locally expires old trips."""
+    client, _flow = mock_digitransit
+    client.get_departures = AsyncMock(
+        return_value=stop_response(route="8", departure_count=4)
+    )
+    entry = make_entry(
+        route="8", options={
+            "map_stop_departures": 2,
+            "scan_interval": 30,
+        }
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    first = hass.states.async_all("geo_location")
+    assert len(first) == 1
+    ident = first[0].entity_id
+    attrs = first[0].attributes
+    assert attrs["source"] == "hslhrt_stops"
+    assert attrs["upcoming_departures_count"] == 2
+    assert attrs["next_departure_1"].endswith("8 → Kamppi")
+    assert attrs["next_departure_2"].endswith("8 → Kamppi")
+    assert attrs["next_departure_1"] != attrs["next_departure_2"]
+    assert "next_departure_3" not in attrs
+    assert client.get_departures.await_count == 1
+
+    # The first route expires without any new data or coordinator refresh.
+    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    coordinator.data["routes"][0]["arrival_timestamp"] = time.time() - 1
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=1))
+    await hass.async_block_till_done()
+    changed = hass.states.get(ident).attributes
+    assert changed["upcoming_departures_count"] == 2
+    assert changed["next_departure_1"] == attrs["next_departure_2"]
+    assert changed["next_departure_2"] != attrs["next_departure_2"]
+    assert client.get_departures.await_count == 1
+
+    # Stop timetable also immediately changes when a new response arrives.
+    client.get_departures = AsyncMock(
+        return_value=stop_response(route="2", departure_count=1)
+    )
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    updated = hass.states.get(ident).attributes
+    assert updated["upcoming_departures_count"] == 1
+    assert updated["next_departure_1"].endswith("2 → Kamppi")
+    assert "next_departure_2" not in updated
+    assert client.get_departures.await_count == 1
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get(ident) is None

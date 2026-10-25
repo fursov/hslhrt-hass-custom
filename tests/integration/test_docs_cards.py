@@ -159,6 +159,8 @@ async def test_flow_field_labels_are_available_in_ha_english_translations(hass):
                 "GPS tracking lookahead (minutes)",
             "component.hslhrt.options.step.init.data.tracking_per_route":
                 "Upcoming trips to track per route",
+            "component.hslhrt.options.step.init.data.map_stop_departures":
+                "Upcoming departures shown when tapping a map stop",
         },
     }.items():
         translations = await async_get_translations(hass, "en", section, {"hslhrt"})
@@ -219,6 +221,8 @@ async def test_finnish_flow_translations_load_in_real_home_assistant(hass):
                 "GPS-seurannan aikajänne (minuuttia)",
             "component.hslhrt.options.step.init.data.tracking_per_route":
                 "Seurattavien vuorojen määrä linjaa kohti",
+            "component.hslhrt.options.step.init.data.map_stop_departures":
+                "Karttapysäkin seuraavat lähdöt (määrä)",
             "component.hslhrt.options.error.invalid_selection":
                 "Valitse jokin luettelon arvoista",
         },
