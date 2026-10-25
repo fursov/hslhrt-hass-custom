@@ -27,6 +27,7 @@ from .const import (
     CONF_HFP_ENABLED,
     CONF_HFP_HORIZON,
     CONF_HFP_PER_ROUTE,
+    CONF_MAP_STOP_DEPARTURES,
     CONF_DESTINATION_FILTER,
     CONF_ROUTES,
     CONF_SCAN_INTERVAL,
@@ -34,6 +35,8 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_HFP_HORIZON,
     DEFAULT_HFP_PER_ROUTE,
+    DEFAULT_MAP_STOP_DEPARTURES,
+    MAX_MAP_STOP_DEPARTURES,
     DESTINATION,
     DOMAIN,
     NAME_CODE,
@@ -52,6 +55,7 @@ def _normalized(value: str) -> str:
 
 HFP_HORIZON_CHOICES = (15, 30, 45, 60, 90)
 HFP_PER_ROUTE_CHOICES = (1, 2, 3, 4, 5)
+MAP_STOP_DEPARTURE_CHOICES = tuple(range(1, MAX_MAP_STOP_DEPARTURES + 1))
 
 
 def _dropdown_for_int_choices(values: tuple[int, ...]) -> SelectSelector:
@@ -430,6 +434,15 @@ class HSLHRTOptionsFlow(config_entries.OptionsFlow):
                 errors[CONF_HFP_HORIZON] = "invalid_selection"
             if per_route not in {str(value) for value in HFP_PER_ROUTE_CHOICES}:
                 errors[CONF_HFP_PER_ROUTE] = "invalid_selection"
+            stop_departures = str(
+                user_input.get(
+                    CONF_MAP_STOP_DEPARTURES, DEFAULT_MAP_STOP_DEPARTURES
+                )
+            )
+            if stop_departures not in {
+                str(value) for value in MAP_STOP_DEPARTURE_CHOICES
+            }:
+                errors[CONF_MAP_STOP_DEPARTURES] = "invalid_selection"
             if not errors:
                 destination = _normalized(
                     user_input.get(CONF_DESTINATION_FILTER, ALL)
@@ -445,6 +458,7 @@ class HSLHRTOptionsFlow(config_entries.OptionsFlow):
                         # Preserve the existing integer settings contract.
                         CONF_HFP_HORIZON: int(horizon),
                         CONF_HFP_PER_ROUTE: int(per_route),
+                        CONF_MAP_STOP_DEPARTURES: int(stop_departures),
                     },
                 )
 
@@ -500,6 +514,18 @@ class HSLHRTOptionsFlow(config_entries.OptionsFlow):
                         else entry.options.get(CONF_HFP_PER_ROUTE, DEFAULT_HFP_PER_ROUTE)
                     ),
                 ): _dropdown_for_int_choices(HFP_PER_ROUTE_CHOICES),
+                vol.Required(
+                    CONF_MAP_STOP_DEPARTURES,
+                    default=str(
+                        user_input.get(
+                            CONF_MAP_STOP_DEPARTURES, DEFAULT_MAP_STOP_DEPARTURES
+                        )
+                        if user_input is not None
+                        else entry.options.get(
+                            CONF_MAP_STOP_DEPARTURES, DEFAULT_MAP_STOP_DEPARTURES
+                        )
+                    ),
+                ): _dropdown_for_int_choices(MAP_STOP_DEPARTURE_CHOICES),
             }
         )
         return self.async_show_form(

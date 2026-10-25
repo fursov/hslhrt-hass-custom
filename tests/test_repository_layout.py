@@ -46,7 +46,7 @@ def test_manifest_metadata_and_version():
         "name",
         *sorted(key for key in manifest if key not in ("domain", "name")),
     ]
-    assert manifest["version"] == "0.9.0"
+    assert manifest["version"] == "0.9.1"
     assert manifest["config_flow"] is True
     assert manifest["documentation"].startswith("https://github.com/fursov/")
     assert manifest["issue_tracker"].startswith("https://github.com/fursov/")

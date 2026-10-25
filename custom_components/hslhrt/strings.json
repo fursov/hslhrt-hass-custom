@@ -59,7 +59,8 @@
           "scan_interval": "Refresh interval (minutes)",
           "track_vehicles": "Track GPS positions of upcoming vehicles (HFP)",
           "tracking_horizon_minutes": "GPS tracking lookahead (minutes)",
-          "tracking_per_route": "Upcoming trips to track per route"
+          "tracking_per_route": "Upcoming trips to track per route",
+          "map_stop_departures": "Upcoming departures shown when tapping a map stop"
         }
       }
     },

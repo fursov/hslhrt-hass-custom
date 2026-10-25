@@ -190,3 +190,37 @@ def upcoming_departures(data: dict | None, now_timestamp: float) -> list[dict]:
         ),
         key=lambda item: item["arrival_timestamp"],
     )
+
+
+
+def stop_map_departure_attributes(
+    data: dict | None, now_timestamp: float, limit: int = 5
+) -> dict:
+    """Human-readable next departures in geo_location More Info attributes.
+
+    The coordinator's filtered, already-fetched journeys are the sole data
+    source. Never request new data from here. Display local Helsinki clock
+    times and the date when an arrival is on another calendar day.
+    """
+    from .const import DEFAULT_MAP_STOP_DEPARTURES, MAX_MAP_STOP_DEPARTURES
+
+    if type(limit) is not int or not 1 <= limit <= MAX_MAP_STOP_DEPARTURES:
+        limit = DEFAULT_MAP_STOP_DEPARTURES
+    entries = upcoming_departures(data, now_timestamp)[:limit]
+    today = datetime.fromtimestamp(now_timestamp, tz=HELSINKI).date()
+    attributes = {"upcoming_departures_count": len(entries)}
+    for idx, entry in enumerate(entries, 1):
+        arrival = datetime.fromtimestamp(
+            entry["arrival_timestamp"], tz=HELSINKI
+        )
+        when = (
+            arrival.strftime("%H:%M")
+            if arrival.date() == today
+            else arrival.strftime("%d.%m %H:%M")
+        )
+        route = entry.get("route") or "?"
+        destination = entry.get("destination") or "Unknown destination"
+        attributes[f"next_departure_{idx}"] = (
+            f"{when} · {route} → {destination}"
+        )
+    return attributes
