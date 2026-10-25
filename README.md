@@ -96,7 +96,7 @@ dashboard examples below for a timetable.
 
 </details>
 
-## Optional HFP vehicle tracking (v0.7.0)
+## Optional HFP vehicle tracking
 
 The integration can track **multiple next journeys per route at the configured
 stop**, not just the first bus overall. Open **Configure** and enable
@@ -126,7 +126,7 @@ Some timetable journeys lack the GTFS metadata required for exact matching;
 they remain in the original timetable but are omitted from HFP selection.
 GPS positions are exposed on Home Assistant's Map card when fresh HFP data is available (see below).
 
-## Live vehicle map (v0.8.0)
+## Live vehicles and configured stops on the map
 
 With HFP tracking enabled on a configured stop, the integration now publishes
 **temporary** `geo_location` entities for selected upcoming journeys that
@@ -159,7 +159,8 @@ provides a recognized `vehicle_mode`. Unknown types display only the route
 number rather than a guessed vehicle type. The `marker_label` and
 `vehicle_mode` attributes are also available for automations. Other
 attributes include destination, stop code, arrival time, operator/vehicle,
-position timestamp, heading and speed. The vehicle source is `hslhrt`; the stop source is `hslhrt_stops`.
+position timestamp, heading and speed. The vehicle source is `hslhrt`;
+the stop source is `hslhrt_stops`.
 Both use Home Assistant's standard marker size: the stop's
 `mdi:circle-small` icon appears *inside* the standard marker, not as an
 arbitrarily sized dot. Since they are real geolocation entities, configured
@@ -358,9 +359,11 @@ The built-in Map Card does not render separate icon-and-text controls in the
 same marker; `marker_label` is a simple combined text alternative. Stop
 markers use `label_mode: icon` with the `mdi:circle-small` icon.
 
-Markers are temporary; they disappear if GPS ages beyond 90 seconds or
-a journey is no longer selected. A blank map does not mean timetable sensors
-are broken. No extra MQTT integration in Home Assistant is required.
+Vehicle markers are temporary; they disappear if GPS ages beyond 90 seconds
+or a journey is no longer selected. Configured-stop markers are independent
+of HFP and remain visible while valid stop coordinates are available.
+If no vehicles are shown, the timetable sensors may still be working normally.
+No extra MQTT integration in Home Assistant is required.
 
 ### Historical screenshots
 
