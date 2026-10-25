@@ -1,21 +1,32 @@
 # Changelog
 
-All notable changes to this HSL HRT integration are recorded here. Versions
-are the custom-integration manifest versions, not Home Assistant Core versions.
+All notable changes to this HSL HRT integration are recorded here.
+Versions refer to GitHub release tags, not Home Assistant Core versions.
+The integration manifest normally matches the release tag; the historical
+exception for `v0.8.2` is documented below.
 
-## [0.9.0] — Unreleased
+## [0.9.0] — Pending release
 
 - Refresh route, next-arrival timestamp and minutes-until-arrival sensors
   locally on each UTC minute boundary, without extra Digitransit requests
   or HFP MQTT changes.
-- Automatically advance to the next already-fetched departure when a bus
+- Automatically advance to the next already-fetched departure when a vehicle
   arrives, and clear stale timetable states and attributes once all known
   departures expire, even with a 30-minute API polling interval.
 - Register minute timers only for active timetable entities and clean them
-  up on removal; added unit and real HA tests.
+  up on removal; added unit and real Home Assistant regression tests.
+
+## [0.8.2] — 2026-10-23
+
+> **Historical version mismatch:** GitHub tag `v0.8.2` points to commit
+> `56b30a1`, where `custom_components/hslhrt/manifest.json` already
+> declared version `0.9.0`. This was published as `v0.8.2`; do not
+> rewrite the tag. The next GitHub release should use the matching
+> `v0.9.0` tag on the final release commit.
 
 - Added configured-stop map markers through the separate `hslhrt_stops`
-  geolocation source, with `mdi:circle-small` icons and stop name/code details.
+  geolocation source, with `mdi:circle-small` icons and stop name/code details
+  (PR16).
 - Digitransit stop `lat`/`lon` are retrieved in the existing Routing v2
   departure query; no additional requests or subscription/API-key changes.
 - Show stops independently of HFP availability, refresh their coordinates on
@@ -23,7 +34,7 @@ are the custom-integration manifest versions, not Home Assistant Core versions.
 - Map Card examples now combine `hslhrt` vehicles (route/emoji labels) and
   `hslhrt_stops` stops (circle icons) with separate source display modes.
 - Added real Home Assistant tests for GPS-disabled stops, map coexistence,
-  invalid coordinates, coordinate changes, unload and document configuration.
+  invalid coordinates, coordinate changes, unload and documented configuration.
 
 ## [0.8.1] — 2026-10-23
 

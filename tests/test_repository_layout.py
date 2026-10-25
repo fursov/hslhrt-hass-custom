@@ -106,3 +106,26 @@ def test_config_entry_only_schema_declared():
 def test_python_sources_parse():
     for source in INTEGRATION.rglob("*.py"):
         ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
+
+
+def test_release_090_documents_previous_tag_mismatch():
+    """Release documentation must not silently mislabel historical binaries."""
+    manifest = load_json(INTEGRATION / "manifest.json")
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    release_notes = (
+        ROOT / "docs" / "releases" / "v0.9.0.md"
+    ).read_text(encoding="utf-8")
+
+    assert manifest["version"] == "0.9.0"
+    assert "## [0.9.0] — Pending release" in changelog
+    assert "## [0.8.2] — 2026-10-23" in changelog
+    assert "Historical version mismatch" in changelog
+    assert "56b30a1" in changelog
+    assert "PR16" in changelog
+    assert "## Live vehicles and configured stops on the map" in readme
+    assert "## Optional HFP vehicle tracking" in readme
+    assert "Live vehicle map (v0.8.0)" not in readme
+    assert "v0.9.0" in release_notes
+    assert "PR17" in release_notes
+    assert "v0.8.2" in release_notes
