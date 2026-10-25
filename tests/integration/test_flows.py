@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.data_entry_flow import FlowResultType, InvalidData
 
 from custom_components.hslhrt.const import DOMAIN
 
@@ -152,21 +152,22 @@ async def test_stop_map_departure_options_validate_and_default(
     }
     assert fields["map_stop_departures"] == "5"
 
-    invalid = await hass.config_entries.options.async_configure(
-        first["flow_id"],
-        user_input={
-            "routes_filter": ["8"],
-            "destination_filter": "ALL",
-            "scan_interval": 5,
-            "map_stop_departures": "11",
-        },
-    )
-    assert invalid["type"] is FlowResultType.FORM
-    assert invalid["errors"] == {"map_stop_departures": "invalid_selection"}
+    # The real HA flow manager rejects values not allowed by the selector
+    # before invoking our async_step_init validation.
+    with pytest.raises(InvalidData, match="map_stop_departures"):
+        await hass.config_entries.options.async_configure(
+            first["flow_id"],
+            user_input={
+                "routes_filter": ["8"],
+                "destination_filter": "ALL",
+                "scan_interval": 5,
+                "map_stop_departures": "11",
+            },
+        )
     assert entry.options == {}
 
     saved = await hass.config_entries.options.async_configure(
-        invalid["flow_id"],
+        first["flow_id"],
         user_input={
             "routes_filter": ["8"],
             "destination_filter": "ALL",

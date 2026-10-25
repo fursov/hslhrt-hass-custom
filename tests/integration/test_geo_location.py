@@ -296,7 +296,7 @@ async def test_stop_more_info_configured_departures_refresh_without_extra_api(
         return_value=stop_response(route="8", departure_count=4)
     )
     entry = make_entry(
-        route="8", options={
+        route="ALL", options={
             "map_stop_departures": 2,
             "scan_interval": 30,
         }
