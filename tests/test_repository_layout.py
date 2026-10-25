@@ -117,7 +117,7 @@ def test_release_090_documents_previous_tag_mismatch():
         ROOT / "docs" / "releases" / "v0.9.0.md"
     ).read_text(encoding="utf-8")
 
-    assert manifest["version"] == "0.9.0"
+    assert manifest["version"] == "0.9.1"
     assert "## [0.9.0] — 2026-10-25" in changelog
     assert "## [0.9.1] — Unreleased" in changelog
     assert "## [0.8.2] — 2026-10-23" in changelog
