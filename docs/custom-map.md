@@ -98,7 +98,7 @@ target:
   entity_id:
     - geo_location.hslhrt_stop_aaaaaaaaaaaaaaaa
     - geo_location.hslhrt_stop_bbbbbbbbbbbbbbbb
-title: HSL — ближайшие отправления
+title: HSL — upcoming departures
 card:
   type: markdown
   content: |
@@ -110,13 +110,13 @@ card:
     ### {{ name }} ({{ code }})
 
     {% if count > 0 %}
-    | № | Прибытие · Маршрут → Направление |
+    | No. | Arrival · Route → Direction |
     |---:|:---|
     {% for i in range(1, count + 1) -%}
     | {{ i }} | {{ state_attr(e, 'next_departure_' ~ i) }} |
     {% endfor %}
     {% else %}
-    Нет ближайших отправлений.
+    No upcoming departures.
     {% endif %}
 adaptive: false
 adaptive_allow_mode_change: false
@@ -160,8 +160,8 @@ The values already contain a local **clock time**, public route and
 destination (for example, `16:58 · 530 → Matinkylä`). The table is populated
 from the integration's existing coordinator data, so opening the popup makes
 **no new Digitransit requests**. Rows are refreshed as the stop's attributes
-are updated. The example popup is written in Russian; translate the title,
-table headers and empty-message text freely.
+are updated. All example UI text is in English; customize the title, table headers,
+and empty-state message for your Home Assistant language as needed.
 
 ### What happens when clicking markers?
 
