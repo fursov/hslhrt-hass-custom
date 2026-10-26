@@ -20,6 +20,10 @@ for name in ("homeassistant", "homeassistant.helpers"):
         module = types.ModuleType(name)
         module.__path__ = []
         sys.modules[name] = module
+if "homeassistant.core" not in sys.modules:
+    module = types.ModuleType("homeassistant.core")
+    module.callback = lambda func: func
+    sys.modules["homeassistant.core"] = module
 if "homeassistant.helpers.event" not in sys.modules:
     module = types.ModuleType("homeassistant.helpers.event")
     module.async_track_time_interval = lambda *args, **kwargs: lambda: None

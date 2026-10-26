@@ -13,6 +13,7 @@ from collections import defaultdict
 from datetime import timedelta
 from typing import Any, Callable
 
+from homeassistant.core import callback
 from homeassistant.helpers.event import async_track_time_interval
 
 from .const import (
@@ -345,6 +346,12 @@ class HFPManager:
             result.append(row)
         return result
 
+    @callback
+    def _on_maintenance_timer(self, _now) -> None:
+        """Run periodic MQTT maintenance in the Home Assistant event loop."""
+        self._schedule_subscription_sync()
+        self._notify(force=True)
+
     async def async_start(self) -> None:
         """Initialize subscriptions and start reconnecting in the background."""
         self._remove_coordinator = self.coordinator.async_add_listener(
@@ -352,7 +359,7 @@ class HFPManager:
         )
         self._remove_timer = async_track_time_interval(
             self.hass,
-            lambda _now: (self._schedule_subscription_sync(), self._notify(force=True)),
+            self._on_maintenance_timer,
             timedelta(seconds=30),
         )
         self._refresh_targets()

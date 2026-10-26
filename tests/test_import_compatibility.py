@@ -46,6 +46,7 @@ def test_integration_imports_without_homeassistant_core_config(monkeypatch):
         pass
 
     core.HomeAssistant = HomeAssistant
+    core.callback = lambda func: func
     # Intentionally do NOT define core.Config.
     helper_typing.ConfigType = dict
     exceptions.ConfigEntryAuthFailed = ConfigEntryAuthFailed
