@@ -288,7 +288,10 @@ def stop_map_departure_attributes(
             f"{legacy_time} · {route} → {destination}"
         )
 
-        kind = entry.get("event_kind") or "departure"
+        # Older rows without event metadata retain the old attribute contract.
+        if "event_kind" not in entry:
+            continue
+        kind = entry["event_kind"]
         origin = entry.get("is_origin_stop")
         live = fresh and origin is not None and entry.get("display_source") == "realtime"
         event_time = entry.get("display_timestamp", entry["arrival_timestamp"])
