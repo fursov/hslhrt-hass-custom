@@ -6,10 +6,6 @@ vehicle and stop entities) and **Browser Mod** (for a custom departures table
 when a stop marker is clicked). It is based on a working dashboard configuration
 and uses existing HSL HRT v0.9.2 entity attributes.
 
-<!-- TODO: screenshot — map with blue stop circles and live vehicle labels -->
-<!-- TODO: screenshot — a stop's Browser Mod popup listing five departures -->
-<!-- TODO: screenshot — separate popup configuration subview in edit mode -->
-
 ## Requirements
 
 Install and configure the [HSL HRT integration](installation.md), with
@@ -62,6 +58,11 @@ filter:
         tap_action:
           action: more-info
 ```
+
+![HSL live transport map with blue stop circles and vehicle route markers](../resources/images/hsl-map-example.png)
+
+*Example: live buses and configured stop platforms near Matinkylä. The map displays
+vehicles and small circular markers for stop platforms.*
 
 This arrangement gives stops **small light-blue circles** and vehicles
 **larger blue labels** (for example, `🚌 530`). `z_index_offset: 100` keeps
@@ -122,6 +123,11 @@ adaptive: false
 adaptive_allow_mode_change: false
 popup_card_all_views: true
 ```
+
+![Browser Mod popup displaying the next five departures for Eestinmalmintie](../resources/images/schedule-example.png)
+
+*Example: clicking a stop circle opens the upcoming-departures table for
+Eestinmalmintie (E4971), with arrival times, routes and destinations.*
 
 **Replace the two illustrative `geo_location.hslhrt_stop_…` IDs** with
 the actual stop entity IDs from **Developer Tools → States** or
@@ -184,13 +190,11 @@ For a dedicated map in the sidebar, add a dashboard view and select a
 recognizable icon such as `mdi:bus-multiple`. Use a Panel view for a
 wide map; a Sections view may constrain the card width.
 
-## Screenshots to add later
+## Additional screenshots (optional)
 
-- Map at a scale where circles, vehicles and their relative size are visible.
-- Pop-up schedule after clicking an intermediate stop.
-- Editing the Browser Mod popup card in the separate subview (with the
-  example `target.entity_id` list).
-- Optional mobile version of the popup.
+The live map and stop popup screenshots above illustrate the complete setup.
+Further screenshots could show the Browser Mod popup-card editor in its
+separate subview or the same popup on a mobile device.
 
 ## Limitations
 
