@@ -265,16 +265,39 @@ def stop_map_departure_attributes(
 
     if type(limit) is not int or not 1 <= limit <= MAX_MAP_STOP_DEPARTURES:
         limit = DEFAULT_MAP_STOP_DEPARTURES
-    entries = upcoming_departures(data, now_timestamp, for_board=True)[:limit]
     today = datetime.fromtimestamp(now_timestamp, tz=HELSINKI).date()
-    attributes = {"upcoming_departures_count": len(entries)}
     checked_at = (data or {}).get("prediction_checked_at")
     fresh = (
         type(checked_at) in (int, float)
         and math.isfinite(checked_at)
         and 0 <= now_timestamp - checked_at <= REALTIME_FRESHNESS_SECONDS
     )
-    for idx, entry in enumerate(entries, 1):
+    # Select after checking freshness: an old realtime prediction may still
+    # be in the future even though the scheduled event has already passed.
+    # Never display an already-expired scheduled time as "upcoming".
+    candidates = []
+    for entry in (data or {}).get(DICT_KEY_ROUTES) or []:
+        if not isinstance(entry, dict):
+            continue
+        live = (
+            fresh
+            and entry.get("is_origin_stop") is not None
+            and entry.get("display_source") == "realtime"
+        )
+        event_time = (
+            entry.get("display_timestamp", entry.get("arrival_timestamp"))
+            if live else entry.get(
+                "display_scheduled_timestamp", entry.get("arrival_timestamp")
+            )
+        )
+        if type(event_time) not in (int, float) or not math.isfinite(event_time):
+            continue
+        if event_time >= now_timestamp:
+            candidates.append((event_time, entry, live))
+    candidates.sort(key=lambda candidate: candidate[0])
+    entries = candidates[:limit]
+    attributes = {"upcoming_departures_count": len(entries)}
+    for idx, (event_time, entry, live) in enumerate(entries, 1):
         arrival = datetime.fromtimestamp(entry["arrival_timestamp"], tz=HELSINKI)
         # Preserve the v0.9.1 attribute contract for existing dashboards.
         legacy_time = (
@@ -292,15 +315,6 @@ def stop_map_departure_attributes(
         if "event_kind" not in entry:
             continue
         kind = entry["event_kind"]
-        origin = entry.get("is_origin_stop")
-        live = fresh and origin is not None and entry.get("display_source") == "realtime"
-        event_time = entry.get("display_timestamp", entry["arrival_timestamp"])
-        scheduled_time = entry.get("display_scheduled_timestamp", event_time)
-        if not live and type(scheduled_time) in (int, float):
-            event_time = scheduled_time
-
-        if type(event_time) not in (int, float) or not math.isfinite(event_time):
-            continue
         local = datetime.fromtimestamp(event_time, tz=HELSINKI)
         clock = (
             local.strftime("%H:%M")
