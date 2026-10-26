@@ -20,7 +20,8 @@ and the public HSL HFP MQTT stream.
 - **Map markers:** expose temporary vehicle `geo_location` entities and
   independently expose configured stop locations.
 - **Stop departures on the map:** tap a stop marker to see its next
-  departures (configurable count, default five).
+  departures (configurable count, default five), including fresh realtime
+  arrival countdowns and separate departure times at route origins.
 - **English and Finnish configuration interface.**
 
 ## How it works

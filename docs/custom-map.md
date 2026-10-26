@@ -111,10 +111,11 @@ card:
     ### {{ name }} ({{ code }})
 
     {% if count > 0 %}
-    | No. | Arrival · Route → Direction |
+    | No. | Arrival / departure · Route → Direction |
     |---:|:---|
     {% for i in range(1, count + 1) -%}
-    | {{ i }} | {{ state_attr(e, 'next_departure_' ~ i) }} |
+    {% set label = state_attr(e, 'next_departure_' ~ i ~ '_display') or state_attr(e, 'next_departure_' ~ i) %}
+    | {{ i }} | {{ label }} |
     {% endfor %}
     {% else %}
     No upcoming departures.
@@ -162,8 +163,12 @@ The popup reads already available stop attributes:
 - `next_departure_1`, `next_departure_2` and so on, up to the configured
   limit (**1–10, default 5**).
 
-The values already contain a local **clock time**, public route and
-destination (for example, `16:58 · 530 → Matinkylä`). The table is populated
+The backward-compatible `next_departure_N` values contain local clock times,
+route and destination (for example, `16:58 · 530 → Matinkylä`). The optional
+`next_departure_N_display` values additionally show `4 min (realtime)`
+when a fresh arrival prediction is available at a through stop, or a local
+clock time / departure time at origins and when no fresh prediction exists.
+The popup uses the new field when available and falls back to the old field. The table is populated
 from the integration's existing coordinator data, so opening the popup makes
 **no new Digitransit requests**. Rows are refreshed as the stop's attributes
 are updated. All example UI text is in English; customize the title, table headers,
@@ -202,8 +207,8 @@ separate subview or the same popup on a mobile device.
   checked for YAML structure in CI. CI cannot render third-party frontend
   cards or verify the appearance of the popup on a particular browser.
 - Vehicle telemetry does **not** generate its own arrival estimate.
-  The popup currently shows the arrival/departure times provided by the
-  integration, not the proposed special origin-stop representation.
-  See [Realtime countdown and origin-stop design](realtime-arrivals.md).
+  The popup uses Digitransit realtime predictions when fresh, while origin
+  stops show departures without an approaching-vehicle ETA. See
+  [Realtime arrival semantics](realtime-arrivals.md).
 - Keep `popup_card_all_views` enabled only if the same popup behavior is
   desired on all views of this dashboard.

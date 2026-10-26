@@ -319,7 +319,10 @@ async def test_stop_more_info_configured_departures_refresh_without_extra_api(
 
     # The first route expires without any new data or coordinator refresh.
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    coordinator.data["routes"][0]["arrival_timestamp"] = time.time() - 1
+    expired = time.time() - 1
+    coordinator.data["routes"][0]["arrival_timestamp"] = expired
+    coordinator.data["routes"][0]["display_timestamp"] = expired
+    coordinator.data["routes"][0]["display_scheduled_timestamp"] = expired
     async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=1))
     await hass.async_block_till_done()
     changed = hass.states.get(ident).attributes
