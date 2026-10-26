@@ -124,14 +124,16 @@ async def test_browser_mod_stop_popup_renders_multiple_stops(hass):
                 "stop_code": code,
                 "upcoming_departures_count": 2,
                 "next_departure_1": "12:31 · 530 → Matinkylä",
+                "next_departure_1_display": "4 min (realtime) · 530 → Matinkylä",
                 "next_departure_2": "12:38 · 7 → Pasila",
+                "next_departure_2_display": "12:38 departs (scheduled) · 7 → Pasila",
             },
         )
         actual = content.replace("more_info.entityId", entity)
         rendered = Template(actual, hass).async_render(parse_result=False)
         assert f"### {name} ({code})" in rendered
-        assert "| 1 | 12:31 · 530 → Matinkylä |" in rendered
-        assert "| 2 | 12:38 · 7 → Pasila |" in rendered
+        assert "| 1 | 4 min (realtime) · 530 → Matinkylä |" in rendered
+        assert "| 2 | 12:38 departs (scheduled) · 7 → Pasila |" in rendered
         assert "No upcoming departures." not in rendered
 
 
