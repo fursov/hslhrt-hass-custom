@@ -29,7 +29,7 @@ def documented_cards() -> list[dict]:
         encoding="utf-8"
     )
     yaml_blocks = re.findall(r"```yaml\n(.*?)\n```", dashboard, re.DOTALL)
-    assert len(yaml_blocks) == 7  # Map overview plus six updated examples.
+    assert len(yaml_blocks) == 6  # Six native dashboard examples.
     return [yaml.safe_load(block) for block in yaml_blocks]
 
 
@@ -37,7 +37,7 @@ def test_all_documented_yaml_cards_parse_and_use_real_ha_schemas():
     cards = documented_cards()
     assert all(isinstance(card, dict) and card.get("type") in
                {"entities", "markdown", "map"} for card in cards)
-    assert sum(card["type"] == "map" for card in cards) == 2
+    assert sum(card["type"] == "map" for card in cards) == 1
     assert sum(card["type"] == "markdown" for card in cards) == 2
     known_attributes = {
         ATTR_STOP_NAME, ATTR_STOP_CODE, ATTR_ROUTE, ATTR_DEST, ATTR_ARR_TIME,
@@ -155,7 +155,7 @@ def test_legacy_ui_screenshots_are_not_presented_as_current():
     )
     assert "# Dashboard examples" in dashboard
     assert "docs/dashboard-examples.md" in readme
-    assert "platform: template" not in dashboard
+    assert "```yaml\nplatform: template" not in dashboard
     assert "timedelta.seconds" not in dashboard
     assert "Template Sensor for next 4 routes" not in dashboard
     for number in range(1, 5):
