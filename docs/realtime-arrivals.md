@@ -15,7 +15,14 @@ Useful background:
 - [HSL Open Data](https://www.hsl.fi/en/opendata)
 - [HSL GTFS Realtime notes](https://hsldevcom.github.io/gtfs_rt/)
 - [Digitransit Routing API](https://digitransit.fi/en/developers/apis/1-routing-api/)
+- [Digitransit real-time field semantics](https://digitransit.fi/en/developers/apis/1-routing-api/3-realtime-information/)
 - [GTFS Realtime Trip Updates specification](https://gtfs.org/documentation/realtime/reference/)
+
+Digitransit explicitly documents that `realtimeArrival` and
+`realtimeDeparture` fall back to static times by default; the
+`realtime` flag says whether they were updated from a real-time source.
+A nonempty `realtimeArrival` field **alone** does not mean live GPS-based
+prediction.
 
 We should **not** claim to reproduce a particular physical stop-display's
 proprietary calculation without checking its data feed or observing that
