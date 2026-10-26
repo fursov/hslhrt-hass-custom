@@ -8,7 +8,7 @@ the current v0.8.0 entities, Options Flow or live HFP map.
 The old accompanying YAML used legacy template sensors and an entity-filter
 wrapper. Some of those templates incorrectly handle time after midnight.
 Do **not** copy the old YAML. For supported examples use the
-[Dashboard examples in README](../README.md#dashboard-examples).
+[Dashboard examples](dashboard-examples.md).
 
 ## 1. List of routes and stops (historical)
 
@@ -37,5 +37,5 @@ must not be treated as instructions for the present release.
 This image was captured from an earlier pre-release build in which HFP
 tracking lookahead and journeys-per-route settings used long radio-button
 lists. The final 0.8.0 Options Flow uses **compact drop-downs** instead.
-See [current README](../README.md#stop-setup-and-filtering) for the supported
+See [configuration guide](configuration.md) for the supported
 settings and values.
