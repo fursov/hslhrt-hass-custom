@@ -1,180 +1,205 @@
-# Live HSL map with ha-map-card, auto-entities and Browser Mod
+# Interactive HSL map: ha-map-card, auto-entities and Browser Mod
 
-This is an **optional dashboard setup**. The integration itself needs only
-Home Assistant Core and Digitransit; the frontend cards below are not integration
-dependencies.
+This guide documents a practical Home Assistant setup combining **ha-map-card**
+(for the transport map), **auto-entities** (for automatically selecting live
+vehicle and stop entities) and **Browser Mod** (for a custom departures table
+when a stop marker is clicked). It is based on a working dashboard configuration
+and uses existing HSL HRT v0.9.2 entity attributes.
 
-> Screenshots are pending. The example YAML is provided now; add your actual
-> screenshots later without changing the integration's backend.
->
-> <!-- TODO screenshot: full-screen transport map with buses and stops -->
-> <!-- TODO screenshot: tapped stop showing five upcoming departures -->
-> <!-- TODO screenshot: Browser Mod fullscreen popup with live map -->
+<!-- TODO: screenshot — map with blue stop circles and live vehicle labels -->
+<!-- TODO: screenshot — a stop's Browser Mod popup listing five departures -->
+<!-- TODO: screenshot — separate popup configuration subview in edit mode -->
 
-## Prerequisites
+## Requirements
 
-- Install the HSL HRT integration and configure stops;
-- enable **Track GPS positions** at stops whose live vehicles you want;
-- install [ha-map-card](https://github.com/nathan-gs/ha-map-card) and
-  [auto-entities](https://github.com/thomasloven/lovelace-auto-entities)
-  through HACS as dashboard cards;
-- optionally install [Browser Mod](https://github.com/thomasloven/hass-browser_mod)
-  if you want to open the entire map in a large popup.
+Install and configure the [HSL HRT integration](installation.md), with
+[stops and optional GPS tracking](configuration.md). To reproduce the map
+and stop dialogs, also install these frontend extensions:
 
-The integration exposes two `geo_location` entity sources:
+- [ha-map-card](https://github.com/nathan-gs/ha-map-card)
+- [auto-entities](https://github.com/thomasloven/lovelace-auto-entities)
+- [Browser Mod](https://github.com/thomasloven/hass-browser_mod)
 
-- `hslhrt`: **temporary vehicles** with fresh GPS and a `marker_label`
-  attribute such as `🚌 530`.
-- `hslhrt_stops`: **configured stop platforms**, available even when
-  HFP tracking is off. Stop entity attributes include
-  `next_departure_1` ... `next_departure_N` (default N=5).
+Live vehicles appear only for selected trips with fresh HFP GPS coordinates;
+stop circles are available even if vehicle tracking is disabled.
 
-## 1. Self-updating transport map (recommended)
+## 1. A transport map with distinct stop and vehicle markers
 
-Paste the following into a Manual card. Unlike the built-in Home Assistant
-Map card, **ha-map-card** uses per-entity `display: attribute` and
-`attribute: marker_label`, not `geo_location_sources.label_mode`.
+Create a dashboard view for the map. A **Panel** view is useful if you want
+the map to fill the available width; it accepts one top-level card.
+Add a **Manual** card with the following configuration:
 
 ```yaml
 type: custom:auto-entities
 card:
   type: custom:map-card
-  x: 24.94
-  y: 60.17
-  zoom: 11
-  focus_follow: contains
-  marker_grouping: spread
+  cluster_markers: false
+  card_size: 7
+card_param: entities
+show_empty: true
 filter:
   include:
+    - domain: geo_location
+      attributes:
+        source: hslhrt_stops
+      options:
+        display: icon
+        icon: mdi:circle
+        size: 20
+        color: '#58B8E8'
+        z_index_offset: 1
+        tap_action:
+          action: more-info
     - domain: geo_location
       attributes:
         source: hslhrt
       options:
         display: attribute
         attribute: marker_label
+        size: 42
+        color: '#2196F3'
+        z_index_offset: 100
         tap_action:
           action: more-info
-    - domain: geo_location
-      attributes:
-        source: hslhrt_stops
-      options:
-        display: icon
-        tap_action:
-          action: more-info
-unique: true
 ```
 
-The example longitude/latitude (`x`/`y`) centers the map around Helsinki;
-adjust them and the zoom level to your preferences.
+This arrangement gives stops **small light-blue circles** and vehicles
+**larger blue labels** (for example, `🚌 530`). `z_index_offset: 100` keeps
+vehicle markers above the stop markers if they overlap, and
+`cluster_markers: false` avoids collapsing vehicles and stops into clusters.
 
-`auto-entities` automatically passes matching entity IDs to `ha-map-card`.
-As temporary GPS entities appear or disappear, it updates the map without
-hardcoded journey IDs. Matching by `source` also distinguishes vehicles and
-stops; **do not** use a broad `geo_location.hslhrt_*` vehicle filter,
-because it also matches stop IDs.
+`auto-entities` selects entities by their `source` attribute and injects
+them into the `entities` parameter of `ha-map-card` through
+`card_param: entities`. You do not need to enumerate temporary vehicle IDs
+or edit the map whenever a new bus appears. `show_empty: true` leaves the
+map visible even if no vehicles currently have fresh GPS.
 
-Tap a stop to open Home Assistant's normal **More Info** dialog with
-the next N filtered arrivals. This requires neither Browser Mod nor extra
-backend API calls. Tap a vehicle for its attributes, including route,
-destination, heading, speed and position timestamp. Do not expect a GPS
-marker for every timetable journey.
+The data sources are independent:
 
-The `marker_grouping: spread` option helps when multiple map markers
-overlap. If your installed card does not recognize the option, remove it
-and use the card's default marker layout.
+- `hslhrt_stops`: one `geo_location` entity for each configured stop
+  with known coordinates, including stops without active vehicle tracking.
+- `hslhrt`: temporary `geo_location` entities for selected HFP journeys
+  with fresh GPS positions. `marker_label` holds the transport symbol and
+  public route number when available.
 
-## 2. Open the map in a Browser Mod popup (optional)
+Both marker types retain `tap_action: more-info`. The **next step** makes
+those clicks display a useful table for the configured stops, instead of
+the default attribute list.
 
-Browser Mod's documented `fire-dom-event` action works on a regular
-dashboard button. The following button opens a fullscreen popup
-containing the dynamically populated map:
+## 2. Browser Mod popup for upcoming departures
+
+Create a **separate dashboard subview** to hold the Browser Mod
+`custom:popup-card` configuration. In that subview add a **Manual** card
+using this YAML:
 
 ```yaml
-type: button
-name: HSL live map
-icon: mdi:map
-tap_action:
-  action: fire-dom-event
-  browser_mod:
-    service: browser_mod.popup
-    data:
-      title: HSL live map
-      initial_style: fullscreen
-      content:
-        type: custom:auto-entities
-        card:
-          type: custom:map-card
-          x: 24.94
-          y: 60.17
-          zoom: 11
-          focus_follow: contains
-          marker_grouping: spread
-        filter:
-          include:
-            - domain: geo_location
-              attributes:
-                source: hslhrt
-              options:
-                display: attribute
-                attribute: marker_label
-                tap_action:
-                  action: more-info
-            - domain: geo_location
-              attributes:
-                source: hslhrt_stops
-              options:
-                display: icon
-                tap_action:
-                  action: more-info
-        unique: true
+type: custom:popup-card
+target:
+  entity_id:
+    - geo_location.hslhrt_stop_aaaaaaaaaaaaaaaa
+    - geo_location.hslhrt_stop_bbbbbbbbbbbbbbbb
+title: HSL — ближайшие отправления
+card:
+  type: markdown
+  content: |
+    {% set e = 'more_info.entityId' %}
+    {% set name = state_attr(e, 'stop_name') or 'HSL stop' %}
+    {% set code = state_attr(e, 'stop_code') or '' %}
+    {% set count = state_attr(e, 'upcoming_departures_count') | int(0) %}
+
+    ### {{ name }} ({{ code }})
+
+    {% if count > 0 %}
+    | № | Прибытие · Маршрут → Направление |
+    |---:|:---|
+    {% for i in range(1, count + 1) -%}
+    | {{ i }} | {{ state_attr(e, 'next_departure_' ~ i) }} |
+    {% endfor %}
+    {% else %}
+    Нет ближайших отправлений.
+    {% endif %}
+adaptive: false
+adaptive_allow_mode_change: false
+popup_card_all_views: true
 ```
 
-Browser Mod is used here **to open the map**, not to override taps on map
-markers. The card's documented `tap_action` support does not include
-`fire-dom-event`; changing marker clicks to a Browser Mod popup would
-require separate frontend validation. The standard More Info behavior is
-the supported default.
+**Replace the two illustrative `geo_location.hslhrt_stop_…` IDs** with
+the actual stop entity IDs from **Developer Tools → States** or
+**Settings → Devices & services → Helsinki Regional Transport → Entities**.
+List every configured stop for which you want this popup. Unlike the
+map's `auto-entities` filter, Browser Mod's `target.entity_id` list in
+this example is explicit, so newly added stop entries need to be added here.
 
-## 3. Full-width map view
+The `popup_card_all_views: true` setting makes this popup card apply to
+the dashboard's other views as well, even though you placed the configuration
+card in its own subview. Place the subview in the **same dashboard** as the
+map. Browser Mod must be installed and loaded by the viewing browser.
 
-For a map filling the dashboard area, create a dedicated dashboard view of
-type **Panel** containing only the `custom:auto-entities` wrapper from
-section 1. Panel views support only one root card, so place any additional
-controls inside a wrapper card or choose a different view type.
+### Why `more_info.entityId` is a string
 
-## 4. Built-in Map card alternative
+Keep the exact text:
 
-The built-in map uses a **different schema**. If you do not need
-ha-map-card, auto-entities or Browser Mod, use:
-
-```yaml
-type: map
-geo_location_sources:
-  - source: hslhrt
-    label_mode: attribute
-    attribute: marker_label
-  - source: hslhrt_stops
-    label_mode: icon
-auto_fit: true
+```jinja2
+{% set e = 'more_info.entityId' %}
 ```
 
-Avoid `show_all: true` if you want to select only these two geolocation
-sources. In the built-in card, `show_all` cannot be combined with explicit
-`entities` or `geo_location_sources`.
+Browser Mod replaces the literal placeholder `more_info.entityId` in
+the popup card's string values with **the ID of the entity that was
+clicked**, before Home Assistant renders the Markdown card. This allows
+the same popup template to work for all stops listed in `target.entity_id`.
+Do not replace it with `states('more_info.entityId')` or a fixed stop ID.
 
-## Limitations and verification
+The popup reads already available stop attributes:
 
-- The examples are based on published card configuration interfaces; the
-  **combined setup has not yet been visually verified** in your Home Assistant
-  instance. Adjust version-specific card options if necessary.
-- GPS coordinates and HFP headings are not arrival predictions.
-- The `next_departure_N` stop attributes currently show **clock times**;
-  see [Realtime arrival analysis](realtime-arrivals.md) for proposed
-  predictive countdown indicators and origin-stop behavior.
+- `stop_name` and `stop_code` for the heading;
+- `upcoming_departures_count` for the current number of rows;
+- `next_departure_1`, `next_departure_2` and so on, up to the configured
+  limit (**1–10, default 5**).
 
-## Screenshot checklist (to add later)
+The values already contain a local **clock time**, public route and
+destination (for example, `16:58 · 530 → Matinkylä`). The table is populated
+from the integration's existing coordinator data, so opening the popup makes
+**no new Digitransit requests**. Rows are refreshed as the stop's attributes
+are updated. The example popup is written in Russian; translate the title,
+table headers and empty-message text freely.
 
-1. Main map, preferably showing both transport and stop markers.
-2. Stop marker More Info with five arrivals.
-3. Optional Browser Mod popup at desktop/mobile width.
-4. Example of marker clustering/spreading in a dense area.
+### What happens when clicking markers?
+
+1. Click a **blue stop circle** on the map: `more-info` is intercepted by
+   Browser Mod for a matching `target.entity_id`, and the custom timetable
+   Markdown table appears.
+2. Click a **vehicle marker**: no stop popup matches that entity, so
+   its ordinary More Info opens, with destination, speed, heading and the
+   last reported position.
+3. Click an unlisted stop: it uses the ordinary More Info dialog until
+   you add that stop's entity ID to the popup configuration.
+
+## Optional refinements
+
+Adjust the circle size, colors and `z_index_offset` independently for
+stops and vehicles. If many items overlap, try `cluster_markers: true`;
+the example keeps it false for clarity.
+
+For a dedicated map in the sidebar, add a dashboard view and select a
+recognizable icon such as `mdi:bus-multiple`. Use a Panel view for a
+wide map; a Sections view may constrain the card width.
+
+## Screenshots to add later
+
+- Map at a scale where circles, vehicles and their relative size are visible.
+- Pop-up schedule after clicking an intermediate stop.
+- Editing the Browser Mod popup card in the separate subview (with the
+  example `target.entity_id` list).
+- Optional mobile version of the popup.
+
+## Limitations
+
+- The custom-map YAML is based on a working user configuration and is
+  checked for YAML structure in CI. CI cannot render third-party frontend
+  cards or verify the appearance of the popup on a particular browser.
+- Vehicle telemetry does **not** generate its own arrival estimate.
+  The popup currently shows the arrival/departure times provided by the
+  integration, not the proposed special origin-stop representation.
+  See [Realtime countdown and origin-stop design](realtime-arrivals.md).
+- Keep `popup_card_all_views` enabled only if the same popup behavior is
+  desired on all views of this dashboard.
