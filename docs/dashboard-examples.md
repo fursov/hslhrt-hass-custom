@@ -1,5 +1,13 @@
 # Dashboard examples
 
+## Route sensor history (illustration)
+
+![Example of a route sensor's Home Assistant history](../resources/images/sensor-state-history.png)
+
+This screenshot is **not a timetable card**. It shows changes in the route
+sensor's state; for actual upcoming departures use the attributes or
+dashboard examples below.
+
 The examples below use a stop configured as **Eestinmalmintie (E4971)** with
 the **ALL** routes option. Replace each sample `sensor.eestinmalmintie_e4971_all`
 entity ID (and its suffixes) with the actual entities shown under
