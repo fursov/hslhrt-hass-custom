@@ -43,11 +43,10 @@ components can provide a more customizable map experience.
 
 - [Installation and requirements](docs/installation.md)
 - [Configure stops, filters and GPS tracking](docs/configuration.md)
-- [Sensor, timetable and native dashboard examples](docs/dashboard-examples.md)
-- [Live transport map with ha-map-card, auto-entities and Browser Mod](docs/custom-map.md)
+- [Sensor and timetable dashboard examples](docs/dashboard-examples.md)
+- [Interactive transport map with ha-map-card, auto-entities and Browser Mod stop popups](docs/custom-map.md)
 - [Understanding realtime predictions and origin stops](docs/realtime-arrivals.md)
 - [Development and testing](docs/development.md)
-- [Older UI screenshots (historical reference only)](docs/legacy-ui-examples.md)
 
 ## Credits
 
