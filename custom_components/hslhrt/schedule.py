@@ -1,5 +1,7 @@
 """Pure functions for interpreting Digitransit stop-time records."""
 
+import math
+import time
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -12,6 +14,7 @@ from .const import (
     STOP_CODE,
     STOP_GTFS,
     STOP_NAME,
+    REALTIME_FRESHNESS_SECONDS,
 )
 
 HELSINKI = ZoneInfo("Europe/Helsinki")
@@ -63,6 +66,7 @@ def parse_departures(
     route_filter: str = ALL,
     destination_filter: str = ALL,
     route_filters: list[str] | None = None,
+    fetched_at: float | None = None,
 ) -> dict:
     """Convert serviceDay-relative times to local Helsinki arrival times.
 
@@ -116,6 +120,40 @@ def parse_departures(
             arrival_offset = scheduled
         arrival_timestamp = service_day + arrival_offset
         arrival_dt = datetime.fromtimestamp(arrival_timestamp, tz=timezone.utc)
+
+        # stopPositionInPattern is zero for the first stop of this trip
+        # pattern. Unlike a stop-ID comparison, it also handles loop routes.
+        position = item.get("stopPositionInPattern")
+        is_origin = (
+            position == 0 if type(position) is int and position >= 0 else None
+        )
+        scheduled_departure = item.get("scheduledDeparture")
+        if type(scheduled_departure) is not int:
+            scheduled_departure = scheduled
+        realtime_departure = item.get("realtimeDeparture")
+        has_realtime_departure = (
+            item.get("realtime") is True and type(realtime_departure) is int
+        )
+        departure_offset = (
+            realtime_departure if has_realtime_departure else scheduled_departure
+        )
+        # Unknown origin status is intentionally treated conservatively:
+        # don't present a vehicle-approaching ETA without proof that it
+        # is not the first stop.
+        event_kind = "arrival" if is_origin is False else "departure"
+        display_source = (
+            "realtime"
+            if (realtime if event_kind == "arrival" else has_realtime_departure)
+            and is_origin is not None
+            else "scheduled"
+        )
+        display_timestamp = service_day + (
+            arrival_offset if event_kind == "arrival" else departure_offset
+            if is_origin is True else scheduled_departure
+        )
+        display_scheduled_timestamp = service_day + (
+            scheduled if event_kind == "arrival" else scheduled_departure
+        )
         # HFP identifies a *journey* by GTFS route ID, direction,
         # operating day and first-stop scheduled departure. These values
         # are intentionally separate from the public route number.
@@ -158,6 +196,20 @@ def parse_departures(
                 "scheduled_timestamp": service_day + scheduled,
                 "realtime": realtime,
                 "delay_seconds": arrival_offset - scheduled,
+                "is_origin_stop": is_origin,
+                "event_kind": event_kind,
+                "display_source": display_source,
+                "display_timestamp": display_timestamp,
+                "display_scheduled_timestamp": display_scheduled_timestamp,
+                "scheduled_departure_timestamp": service_day + scheduled_departure,
+                "departure_timestamp": service_day + departure_offset,
+                "realtime_arrival_timestamp": (
+                    arrival_timestamp if realtime else None
+                ),
+                "realtime_departure_timestamp": (
+                    service_day + realtime_departure
+                    if has_realtime_departure else None
+                ),
             }
         )
 
@@ -169,51 +221,63 @@ def parse_departures(
         "stop_latitude": stop.get("lat"),
         "stop_longitude": stop.get("lon"),
         DICT_KEY_ROUTES: routes,
+        "prediction_checked_at": time.time() if fetched_at is None else fetched_at,
     }
 
 
-def upcoming_departures(data: dict | None, now_timestamp: float) -> list[dict]:
-    """Return only upcoming journeys, ordered by their actual arrival time.
+def upcoming_departures(
+    data: dict | None, now_timestamp: float, *, for_board: bool = False
+) -> list[dict]:
+    """Filter and sort cached journeys without mutating coordinator data.
 
-    The service may return a departure whose real-time prediction has
-    already expired. Do not show it as the *next* bus until the next poll.
-    This function does not mutate coordinator data.
+    Legacy arrival sensors keep their original arrival-based semantics.
+    The stop board instead uses the actual event (departure at an origin).
     """
     departures = (data or {}).get(DICT_KEY_ROUTES) or []
-    return sorted(
-        (
-            item
-            for item in departures
-            if isinstance(item, dict)
-            and isinstance(item.get("arrival_timestamp"), (int, float))
-            and item["arrival_timestamp"] >= now_timestamp
-        ),
-        key=lambda item: item["arrival_timestamp"],
+    key = "display_timestamp" if for_board else "arrival_timestamp"
+    upcoming = []
+    for item in departures:
+        if not isinstance(item, dict):
+            continue
+        when = item.get(key, item.get("arrival_timestamp"))
+        if type(when) not in (int, float) or not math.isfinite(when):
+            continue
+        if when >= now_timestamp:
+            upcoming.append(item)
+    upcoming.sort(
+        key=lambda item: item.get(key, item.get("arrival_timestamp"))
     )
+    return upcoming
 
 
 
 def stop_map_departure_attributes(
     data: dict | None, now_timestamp: float, limit: int = 5
 ) -> dict:
-    """Human-readable next departures in geo_location More Info attributes.
+    """Stop board: preserve clock-time attributes and add a truthful ETA.
 
-    The coordinator's filtered, already-fetched journeys are the sole data
-    source. Never request new data from here. Display local Helsinki clock
-    times and the date when an arrival is on another calendar day.
+    A fresh realtime *arrival* at a through stop receives a relative
+    countdown. At an origin only departure time is shown, never an
+    approaching-vehicle ETA. Without reliable realtime/source data,
+    display the scheduled clock time. No network access occurs here.
     """
     from .const import DEFAULT_MAP_STOP_DEPARTURES, MAX_MAP_STOP_DEPARTURES
 
     if type(limit) is not int or not 1 <= limit <= MAX_MAP_STOP_DEPARTURES:
         limit = DEFAULT_MAP_STOP_DEPARTURES
-    entries = upcoming_departures(data, now_timestamp)[:limit]
+    entries = upcoming_departures(data, now_timestamp, for_board=True)[:limit]
     today = datetime.fromtimestamp(now_timestamp, tz=HELSINKI).date()
     attributes = {"upcoming_departures_count": len(entries)}
+    checked_at = (data or {}).get("prediction_checked_at")
+    fresh = (
+        type(checked_at) in (int, float)
+        and math.isfinite(checked_at)
+        and 0 <= now_timestamp - checked_at <= REALTIME_FRESHNESS_SECONDS
+    )
     for idx, entry in enumerate(entries, 1):
-        arrival = datetime.fromtimestamp(
-            entry["arrival_timestamp"], tz=HELSINKI
-        )
-        when = (
+        arrival = datetime.fromtimestamp(entry["arrival_timestamp"], tz=HELSINKI)
+        # Preserve the v0.9.1 attribute contract for existing dashboards.
+        legacy_time = (
             arrival.strftime("%H:%M")
             if arrival.date() == today
             else arrival.strftime("%d.%m %H:%M")
@@ -221,6 +285,43 @@ def stop_map_departure_attributes(
         route = entry.get("route") or "?"
         destination = entry.get("destination") or "Unknown destination"
         attributes[f"next_departure_{idx}"] = (
-            f"{when} · {route} → {destination}"
+            f"{legacy_time} · {route} → {destination}"
         )
+
+        kind = entry.get("event_kind") or "departure"
+        origin = entry.get("is_origin_stop")
+        live = fresh and origin is not None and entry.get("display_source") == "realtime"
+        event_time = entry.get("display_timestamp", entry["arrival_timestamp"])
+        scheduled_time = entry.get("display_scheduled_timestamp", event_time)
+        if not live and type(scheduled_time) in (int, float):
+            event_time = scheduled_time
+
+        if type(event_time) not in (int, float) or not math.isfinite(event_time):
+            continue
+        local = datetime.fromtimestamp(event_time, tz=HELSINKI)
+        clock = (
+            local.strftime("%H:%M")
+            if local.date() == today
+            else local.strftime("%d.%m %H:%M")
+        )
+        if live and kind == "arrival" and event_time >= now_timestamp:
+            minutes = max(0, math.ceil((event_time - now_timestamp) / 60))
+            time_label = f"{minutes} min (realtime)"
+        elif kind == "departure":
+            time_label = f"{clock} departs ({'realtime' if live else 'scheduled'})"
+            minutes = None
+        else:
+            time_label = f"{clock} (scheduled)"
+            minutes = None
+
+        attributes[f"next_departure_{idx}_display"] = (
+            f"{time_label} · {route} → {destination}"
+        )
+        attributes[f"next_departure_{idx}_event"] = kind
+        attributes[f"next_departure_{idx}_source"] = (
+            "realtime" if live else "scheduled"
+        )
+        # This field is intentionally absent unless the prediction is fresh.
+        if minutes is not None:
+            attributes[f"next_departure_{idx}_minutes"] = minutes
     return attributes
