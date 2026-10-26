@@ -92,6 +92,20 @@ def test_custom_map_and_browser_mod_popup_config():
     assert "next_departure_" in content
 
 
+def test_documented_custom_map_screenshots_are_available():
+    """Screenshots linked from the map guide must be real PNGs in this branch."""
+    guide = (ROOT / "docs" / "custom-map.md").read_text(encoding="utf-8")
+    images = ("hsl-map-example.png", "schedule-example.png")
+    for name in images:
+        relative = f"../resources/images/{name}"
+        assert f"]({relative})" in guide
+        path = ROOT / "resources" / "images" / name
+        assert path.is_file(), name
+        data = path.read_bytes()
+        assert len(data) > 10_000, name
+        assert data.startswith(b"\x89PNG\r\n\x1a\n"), name
+
+
 @pytest.mark.asyncio
 async def test_browser_mod_stop_popup_renders_multiple_stops(hass):
     """Emulate Browser Mod's entityId substitution before HA template render."""
