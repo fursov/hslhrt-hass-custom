@@ -154,6 +154,24 @@ class HSLHRTRouteSensor(HSLHRTLocallyUpdatedSensor):
                 ).isoformat(),
                 "realtime": departure["realtime"],
                 "delay_seconds": departure["delay_seconds"],
+                "is_origin_stop": departure.get("is_origin_stop"),
+                "event_kind": departure.get("event_kind"),
+                "prediction_source": departure.get("display_source"),
+                "prediction_checked_at": data.get("prediction_checked_at"),
+                "scheduled_departure_datetime": (
+                    datetime.fromtimestamp(
+                        departure["scheduled_departure_timestamp"], tz=timezone.utc
+                    ).isoformat()
+                    if departure.get("scheduled_departure_timestamp") is not None
+                    else None
+                ),
+                "estimated_departure_datetime": (
+                    datetime.fromtimestamp(
+                        departure["realtime_departure_timestamp"], tz=timezone.utc
+                    ).isoformat()
+                    if departure.get("realtime_departure_timestamp") is not None
+                    else None
+                ),
             }
 
         if upcoming:
