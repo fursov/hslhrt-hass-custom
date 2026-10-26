@@ -25,13 +25,15 @@ ENTITY = "sensor.eestinmalmintie_e4971_all"
 
 
 def documented_cards() -> list[dict]:
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    yaml_blocks = re.findall(r"```yaml\n(.*?)\n```", readme, re.DOTALL)
+    dashboard = (ROOT / "docs" / "dashboard-examples.md").read_text(
+        encoding="utf-8"
+    )
+    yaml_blocks = re.findall(r"```yaml\n(.*?)\n```", dashboard, re.DOTALL)
     assert len(yaml_blocks) == 7  # Map overview plus six updated examples.
     return [yaml.safe_load(block) for block in yaml_blocks]
 
 
-def test_all_readme_yaml_cards_parse_and_use_real_ha_schemas():
+def test_all_documented_yaml_cards_parse_and_use_real_ha_schemas():
     cards = documented_cards()
     assert all(isinstance(card, dict) and card.get("type") in
                {"entities", "markdown", "map"} for card in cards)
@@ -119,15 +121,19 @@ async def test_documented_markdown_templates_handle_no_departures(hass):
             assert "No upcoming departures" in output
 
 
-def test_no_live_readme_screenshots_claim_old_images_are_current():
+def test_legacy_ui_screenshots_are_not_presented_as_current():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    dashboard = (ROOT / "docs" / "dashboard-examples.md").read_text(
+        encoding="utf-8"
+    )
     archive = (ROOT / "docs" / "legacy-ui-examples.md").read_text(
         encoding="utf-8"
     )
-    assert "## Dashboard examples" in readme
-    assert "platform: template" not in readme.split("## Development and tests")[1]
-    assert "timedelta.seconds" not in readme
-    assert "Template Sensor for next 4 routes" not in readme
+    assert "# Dashboard examples" in dashboard
+    assert "docs/dashboard-examples.md" in readme
+    assert "platform: template" not in dashboard
+    assert "timedelta.seconds" not in dashboard
+    assert "Template Sensor for next 4 routes" not in dashboard
     for number in range(1, 5):
         name = f"ui-option-{number}.jpg"
         path = ROOT / "resources" / "images" / name
@@ -169,8 +175,11 @@ async def test_flow_field_labels_are_available_in_ha_english_translations(hass):
 
 
 def test_current_ui_screenshots_exist_and_are_linked():
-    """Screenshots from a real HA instance must exist in the release README."""
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    """Existing real HA screenshots remain linked from their topic guides."""
+    config = (ROOT / "docs" / "configuration.md").read_text(encoding="utf-8")
+    dashboard = (ROOT / "docs" / "dashboard-examples.md").read_text(
+        encoding="utf-8"
+    )
     screenshots = (
         "configure-stop.png",
         "select-stop.png",
@@ -179,20 +188,21 @@ def test_current_ui_screenshots_exist_and_are_linked():
     )
     for filename in screenshots:
         relative_path = f"resources/images/{filename}"
-        assert f"]({relative_path})" in readme
+        guide = dashboard if filename == "sensor-state-history.png" else config
+        assert f"](../{relative_path})" in guide
         path = ROOT / relative_path
         assert path.is_file() and path.stat().st_size > 3_000
         assert path.read_bytes().startswith(bytes((0x89, 0x50, 0x4E, 0x47)))
-    assert "stop-options.png" not in readme
-    assert "current compact Options Flow" in readme
-    assert "stop-options-compact.png" in readme
+    assert "stop-options.png" not in config
+    assert "Compact GPS preferences" in config
+    assert "stop-options-compact.png" in config
     archive = (ROOT / "docs" / "legacy-ui-examples.md").read_text(
         encoding="utf-8"
     )
     assert "stop-options.png" in archive
     assert (ROOT / "resources/images/stop-options.png").is_file()
-    assert "API key intentionally left blank" in readme
-    assert "not a timetable card" in readme.lower()
+    assert "API key blank" in config
+    assert "not a timetable card" in dashboard.lower()
 
 
 
