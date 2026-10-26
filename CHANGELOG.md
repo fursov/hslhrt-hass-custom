@@ -5,6 +5,19 @@ Versions refer to GitHub release tags, not Home Assistant Core versions.
 The integration manifest normally matches the release tag; the historical
 exception for `v0.8.2` is documented below.
 
+## [Unreleased]
+
+- Read Digitransit's stop-specific scheduled and realtime departure times and
+  trip-relative `stopPositionInPattern` without additional API calls.
+- Add `next_departure_N_display` and accompanying source/event/minutes
+  attributes to stop map markers. Fresh (≤120 seconds since last API poll)
+  through-stop realtime predictions show a relative arrival countdown.
+- At a trip's first stop, display the departure clock time without implying
+  a bus is approaching; fall back to scheduled clock times if the realtime
+  data is stale, missing or the trip position is unknown.
+- Preserve legacy sensor names, unique IDs, and `next_departure_N` values;
+  the Browser Mod popup prefers enriched labels with a legacy fallback.
+
 ## [0.9.2] — Unreleased
 
 - Fixed HFP periodic MQTT subscription maintenance: register the timer
