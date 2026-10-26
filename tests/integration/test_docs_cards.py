@@ -64,6 +64,30 @@ def test_all_documented_yaml_cards_parse_and_use_real_ha_schemas():
             assert card["auto_fit"] is True
 
 
+
+def test_optional_custom_map_examples_parse_and_keep_sources_distinct():
+    """Catch invalid optional frontend YAML without loading custom cards in CI."""
+    guide = (ROOT / "docs" / "custom-map.md").read_text(encoding="utf-8")
+    yaml_blocks = re.findall(r"```yaml\n(.*?)\n```", guide, re.DOTALL)
+    assert len(yaml_blocks) == 3
+    dynamic_map, popup_button, native_map = [
+        yaml.safe_load(block) for block in yaml_blocks
+    ]
+    assert dynamic_map["type"] == "custom:auto-entities"
+    assert dynamic_map["card"]["type"] == "custom:map-card"
+    assert [
+        item["attributes"]["source"]
+        for item in dynamic_map["filter"]["include"]
+    ] == ["hslhrt", "hslhrt_stops"]
+    assert popup_button["type"] == "button"
+    popup = popup_button["tap_action"]["browser_mod"]["data"]
+    assert popup["content"]["card"]["type"] == "custom:map-card"
+    assert native_map["type"] == "map"
+    assert [
+        item["source"] for item in native_map["geo_location_sources"]
+    ] == ["hslhrt", "hslhrt_stops"]
+
+
 @pytest.mark.asyncio
 async def test_documented_markdown_templates_render_with_real_ha(
     hass,
