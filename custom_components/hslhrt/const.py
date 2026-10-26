@@ -41,6 +41,8 @@ DEPARTURE_LIMIT = 100
 # Keep entity attributes small to avoid bloating Recorder storage.
 MAX_LEGACY_ROUTES = 20
 MAX_DEPARTURES_ATTRIBUTE = 10
+# Only recent successful Digitransit responses are labeled as live predictions.
+REALTIME_FRESHNESS_SECONDS = 120
 
 NAME_CODE = "user_name_code"
 STOP_CODE = "stop_code"
@@ -104,6 +106,9 @@ query StopDepartures($id: String!) {
       serviceDay
       scheduledArrival
       realtimeArrival
+      scheduledDeparture
+      realtimeDeparture
+      stopPositionInPattern
       realtime
       realtimeState
       headsign
