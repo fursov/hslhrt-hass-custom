@@ -118,7 +118,7 @@ async def test_browser_mod_stop_popup_renders_multiple_stops(hass):
         assert f"### {name} ({code})" in rendered
         assert "| 1 | 12:31 · 530 → Matinkylä |" in rendered
         assert "| 2 | 12:38 · 7 → Pasila |" in rendered
-        assert "Нет ближайших отправлений" not in rendered
+        assert "No upcoming departures." not in rendered
 
 
 @pytest.mark.asyncio
@@ -134,7 +134,7 @@ async def test_browser_mod_stop_popup_handles_no_departures(hass):
     actual = popup["card"]["content"].replace("more_info.entityId", entity)
     rendered = Template(actual, hass).async_render(parse_result=False)
     assert "### Kamppi (H1234)" in rendered
-    assert "Нет ближайших отправлений." in rendered
+    assert "No upcoming departures." in rendered
     assert "12:31" not in rendered
 
 
