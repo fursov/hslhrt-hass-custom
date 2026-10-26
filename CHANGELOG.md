@@ -5,7 +5,15 @@ Versions refer to GitHub release tags, not Home Assistant Core versions.
 The integration manifest normally matches the release tag; the historical
 exception for `v0.8.2` is documented below.
 
-## [0.9.1] — Unreleased
+## [0.9.2] — Unreleased
+
+- Fixed HFP periodic MQTT subscription maintenance: register the timer
+  callback on Home Assistant's event loop rather than running
+  `hass.async_create_task` from an executor thread (PR21).
+- Updated lightweight-test Home Assistant callback stubs and added a
+  regression check for the periodic timer registration.
+
+## [0.9.1] — 2026-10-25
 
 - Display configurable upcoming arrivals on each stop's standard Map
   More Info dialog: 1–10 entries per configuration, default 5, as
