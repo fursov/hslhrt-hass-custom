@@ -5,7 +5,17 @@ Versions refer to GitHub release tags, not Home Assistant Core versions.
 The integration manifest normally matches the release tag; the historical
 exception for `v0.8.2` is documented below.
 
-## [Unreleased]
+## [0.9.5] — Unreleased
+
+- Added the Home Assistant integration category
+  `vehicles_transport.public_transport` to `manifest.json` for catalog
+  discovery by public-transport users.
+- Prepared release metadata and updated the changelog to reflect the
+  already-published v0.9.4 and v0.9.2 releases.
+- Metadata-only update: no runtime behavior, configuration, API polling,
+  MQTT subscriptions, entities or dependencies changed.
+
+## [0.9.4] — 2026-10-27
 
 - Deduplicate live HFP map markers across separately configured stops by
   exact journey identity; a vehicle remains visible while any configured
@@ -30,7 +40,7 @@ exception for `v0.8.2` is documented below.
 - Preserve legacy sensor names, unique IDs, and `next_departure_N` values;
   the Browser Mod popup prefers enriched labels with a legacy fallback.
 
-## [0.9.2] — Unreleased
+## [0.9.2] — 2026-10-26
 
 - Fixed HFP periodic MQTT subscription maintenance: register the timer
   callback on Home Assistant's event loop rather than running
