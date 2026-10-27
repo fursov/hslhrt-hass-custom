@@ -5,15 +5,19 @@ Versions refer to GitHub release tags, not Home Assistant Core versions.
 The integration manifest normally matches the release tag; the historical
 exception for `v0.8.2` is documented below.
 
-## [0.9.5] — Unreleased
+## [0.9.5] — 2026-10-27
 
-- Added the Home Assistant integration category
-  `vehicles_transport.public_transport` to `manifest.json` for catalog
-  discovery by public-transport users.
-- Prepared release metadata and updated the changelog to reflect the
-  already-published v0.9.4 and v0.9.2 releases.
-- Metadata-only update: no runtime behavior, configuration, API polling,
-  MQTT subscriptions, entities or dependencies changed.
+- Allow multiple routes in the initial stop setup using comma-separated,
+  whitespace-separated or mixed input (e.g. `158, 530`, `158 530`).
+  Normalize and deduplicate the selection; validate every requested route
+  and reject mixtures of `ALL` with explicit route numbers (PR28).
+- Reuse the existing multi-route timetable filter and preselect configured
+  routes in the Options Flow. Existing single-route and `ALL` entries,
+  entity IDs and unique IDs remain compatible.
+- Add the Home Assistant integration category
+  `vehicles_transport.public_transport` to `manifest.json` to improve
+  discovery in integration catalogs (PR27).
+- Correct the published-release dates for v0.9.4 and v0.9.2.
 
 ## [0.9.4] — 2026-10-27
 
