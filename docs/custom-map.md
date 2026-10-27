@@ -197,8 +197,9 @@ The vehicle's More Info also exposes:
 
 - `tracked_stop_codes`: all configured stops currently tracking the
   exact journey (e.g. `E4971`, `E4972`);
-- `next_tracked_stop`: the first *future configured stop* in timetable
-  order (e.g. `E4972` after passing `E4971`);
+- `next_tracked_stop`: the code of the first *future configured stop* in
+  timetable order (e.g. `E4972` after passing `E4971`);
+- `next_tracked_stop_name`: its human-readable stop name;
 - `distance_to_next_tracked_stop_km`: straight-line vehicle-to-stop
   distance, measured in kilometers, or `null` if there is no future
   tracked stop or valid stop location.
