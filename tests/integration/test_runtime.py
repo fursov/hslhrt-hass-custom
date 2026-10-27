@@ -172,3 +172,36 @@ async def test_minute_tick_updates_eta_and_next_route_without_extra_api_calls(
         for entity_id in ids
     )
     assert client.get_departures.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_initial_multi_route_selection_filters_real_coordinator_and_sensor(
+    hass, make_entry, mock_digitransit, stop_response
+):
+    """Comma-separated setup data powers sensors through the existing route list."""
+    client, _ = mock_digitransit
+    result = stop_response(route="8", departure_count=3)
+    stoptimes = result["stoptimesWithoutPatterns"]
+    stoptimes[1]["trip"]["route"]["shortName"] = "2"
+    stoptimes[2]["trip"]["route"]["shortName"] = "530"
+    client.get_departures = AsyncMock(return_value=result)
+
+    entry = make_entry(route="2,8")
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
+    assert [row["route"] for row in coordinator.data["routes"]] == ["8", "2"]
+    registry = er.async_get(hass)
+    route_entity = next(
+        row for row in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if row.unique_id == "HSL:1000 2,8"
+    )
+    state = hass.states.get(route_entity.entity_id)
+    assert state.state == "8"
+    assert [row["route"] for row in state.attributes["departures"]] == ["8", "2"]
+    assert client.get_departures.await_count == 1
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
