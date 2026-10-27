@@ -181,9 +181,32 @@ and empty-state message for your Home Assistant language as needed.
    Markdown table appears.
 2. Click a **vehicle marker**: no stop popup matches that entity, so
    its ordinary More Info opens, with destination, speed, heading and the
-   last reported position.
+   last reported position. One HFP journey has **one marker**, even when
+   several configured stops track it; the marker survives while at least
+   one stop is still watching that journey.
 3. Click an unlisted stop: it uses the ordinary More Info dialog until
    you add that stop's entity ID to the popup configuration.
+
+### Distance and the next tracked stop
+
+In Home Assistant geolocation, the built-in `distance` is the straight-line
+distance **from the Home Assistant Home coordinates to the vehicle**.
+It is not the distance to an HSL stop, so the integration preserves it.
+
+The vehicle's More Info also exposes:
+
+- `tracked_stop_codes`: all configured stops currently tracking the
+  exact journey (e.g. `E4971`, `E4972`);
+- `next_tracked_stop`: the first *future configured stop* in timetable
+  order (e.g. `E4972` after passing `E4971`);
+- `distance_to_next_tracked_stop_km`: straight-line vehicle-to-stop
+  distance, measured in kilometers, or `null` if there is no future
+  tracked stop or valid stop location.
+
+**Next tracked stop is not necessarily the very next physical stop along
+the route**. Unconfigured intermediate stops are not represented. This
+distance is not a road-routing distance and is not used for the upstream
+Digitransit realtime arrival estimate.
 
 ## Optional refinements
 
