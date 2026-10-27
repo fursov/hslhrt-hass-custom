@@ -53,7 +53,30 @@ def test_manifest_metadata_and_version():
     assert manifest["issue_tracker"].startswith("https://github.com/fursov/")
     assert manifest["codeowners"] == ["@fursov"]
     assert manifest["requirements"] == ["paho-mqtt>=2.1.0"]
+    # HACS rejects unknown category identifiers. Public transport is an
+    # official Home Assistant integration category.
+    assert manifest["categories"] == ["vehicles_transport.public_transport"]
+    assert tuple(map(int, manifest["version"].split("."))) >= (0, 9, 5)
 
+
+
+def test_release_095_metadata_is_documented():
+    """The release notes cover both merged PR28 and the manifest update."""
+    manifest = load_json(INTEGRATION / "manifest.json")
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    notes = (ROOT / "docs" / "releases" / "v0.9.5.md").read_text(
+        encoding="utf-8"
+    )
+    assert manifest["version"] == "0.9.5"
+    assert "## [0.9.5] — 2026-10-27" in changelog
+    assert "## [0.9.4] — 2026-10-27" in changelog
+    assert "## [0.9.3] — 2026-10-26" in changelog
+    assert "## [0.9.2] — 2026-10-26" in changelog
+    assert "PR28" in changelog and "PR28" in notes
+    assert "158, 530" in changelog and "158 530" in notes
+    assert "vehicles_transport.public_transport" in notes
+    assert "v0.9.5" in notes
+    assert "draft" not in notes.lower()
 
 def test_hacs_metadata():
     hacs = load_json(ROOT / "hacs.json")

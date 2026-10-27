@@ -5,7 +5,21 @@ Versions refer to GitHub release tags, not Home Assistant Core versions.
 The integration manifest normally matches the release tag; the historical
 exception for `v0.8.2` is documented below.
 
-## [Unreleased]
+## [0.9.5] — 2026-10-27
+
+- Allow multiple routes in the initial stop setup using comma-separated,
+  whitespace-separated or mixed input (e.g. `158, 530`, `158 530`).
+  Normalize and deduplicate the selection; validate every requested route
+  and reject mixtures of `ALL` with explicit route numbers (PR28).
+- Reuse the existing multi-route timetable filter and preselect configured
+  routes in the Options Flow. Existing single-route and `ALL` entries,
+  entity IDs and unique IDs remain compatible.
+- Add the Home Assistant integration category
+  `vehicles_transport.public_transport` to `manifest.json` to improve
+  discovery in integration catalogs (PR27).
+- Correct the published-release dates for v0.9.4 and v0.9.2.
+
+## [0.9.4] — 2026-10-27
 
 - Deduplicate live HFP map markers across separately configured stops by
   exact journey identity; a vehicle remains visible while any configured
@@ -30,7 +44,7 @@ exception for `v0.8.2` is documented below.
 - Preserve legacy sensor names, unique IDs, and `next_departure_N` values;
   the Browser Mod popup prefers enriched labels with a legacy fallback.
 
-## [0.9.2] — Unreleased
+## [0.9.2] — 2026-10-26
 
 - Fixed HFP periodic MQTT subscription maintenance: register the timer
   callback on Home Assistant's event loop rather than running
