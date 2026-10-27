@@ -6,7 +6,7 @@
         "description": "Enter a stop name or code and your Digitransit API key. See the README for the API portal link.",
         "data": {
           "user_name_code": "Stop name or code",
-          "route": "Route (ALL for any)",
+          "route": "Routes (ALL or comma/space-separated)",
           "destination": "Destination (ALL for any)",
           "api_key": "Digitransit API key"
         }

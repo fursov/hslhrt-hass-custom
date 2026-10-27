@@ -1,5 +1,7 @@
 """Pure configuration helpers shared by the flows and entities."""
 
+import re
+
 from .const import (
     ALL,
     CONF_DESTINATION_FILTER,
@@ -9,6 +11,35 @@ from .const import (
     DESTINATION,
     ROUTE,
 )
+
+
+def parse_route_filter(value: str) -> list[str]:
+    """Interpret ALL or route numbers separated by commas and/or whitespace.
+
+    Case-insensitive de-duplication and sorting make the same logical
+    selection stable regardless of spelling, separator or input order.
+    An empty value (or ALL alone) means every route. Mixing ALL with
+    explicit routes is invalid rather than silently ignoring the latter.
+    """
+    if not isinstance(value, str):
+        raise ValueError("Route filter must be a string")
+    if not value.strip():
+        return []
+    tokens = [token for token in re.split(r"[,\s]+", value.strip()) if token]
+    if not tokens:
+        raise ValueError("No route names supplied")
+    if any(token.casefold() == ALL for token in tokens):
+        if len(tokens) == 1:
+            return []
+        raise ValueError("ALL cannot be combined with explicit routes")
+    unique = {token.casefold(): token.upper() for token in tokens}
+    return sorted(unique.values(), key=str.casefold)
+
+
+def canonical_route_filter(value: str) -> str:
+    """Persist a deterministic route string while retaining legacy IDs."""
+    routes = parse_route_filter(value)
+    return ",".join(routes) if routes else ALL.upper()
 
 
 def available_routes(stop: dict) -> list[str]:
@@ -30,8 +61,7 @@ def default_selected_routes(data: dict, options: dict) -> list[str]:
     """Retain legacy route filtering until the user changes the options."""
     if CONF_ROUTES in options:
         return list(options[CONF_ROUTES])
-    route = data.get(ROUTE, ALL) or ALL
-    return [route] if route.casefold() != ALL else []
+    return parse_route_filter(data.get(ROUTE, ALL) or ALL)
 
 
 def effective_filters(data: dict, options: dict) -> tuple[str, str, list[str] | None]:
@@ -47,6 +77,10 @@ def effective_filters(data: dict, options: dict) -> tuple[str, str, list[str] | 
     )
     selected_routes = options.get(CONF_ROUTES)
     if selected_routes is None:
+        routes = parse_route_filter(legacy_route)
+        if len(routes) > 1:
+            return ALL, destination, routes
+        # Existing single-route config entries retain their old semantics.
         return legacy_route, destination, None
     selected = [
         value.strip()
