@@ -178,3 +178,64 @@ async def test_stop_map_departure_options_validate_and_default(
     assert saved["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options["map_stop_departures"] == 3
     assert entry.unique_id == "HSL:1000 8"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("route_value", ["8, 2", "8 2", "8,2", "2,8  2"])
+async def test_initial_multi_route_setup_uses_one_canonical_entry(
+    hass, mock_digitransit, route_value
+):
+    """Multiple text separators produce one stable config entry/unique ID."""
+    initial = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": "user"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        initial["flow_id"],
+        user_input={
+            "user_name_code": "E4971",
+            "route": route_value,
+            "destination": "ALL",
+            "api_key": "TEST-KEY",
+        },
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"]["route"] == "2,8"
+    assert result["result"].unique_id == "HSL:1000 2,8"
+    assert result["result"].title.endswith("2,8")
+    assert result["result"].options == {}
+
+    # Existing dropdown options must automatically preselect all routes.
+    options = await hass.config_entries.options.async_init(
+        result["result"].entry_id
+    )
+    assert options["type"] is FlowResultType.FORM
+    fields = {
+        field.schema: field.default()
+        for field in options["data_schema"].schema
+    }
+    assert fields["routes_filter"] == ["2", "8"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("route_value", ["8,missing", "2 999", "ALL,8", "all 2", ",,"])
+async def test_initial_multi_route_setup_rejects_unavailable_or_mixed_all(
+    hass, mock_digitransit, route_value
+):
+    """Reject invalid setup input rather than partially configuring routes."""
+    initial = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": "user"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        initial["flow_id"],
+        user_input={
+            "user_name_code": "E4971",
+            "route": route_value,
+            "destination": "ALL",
+            "api_key": "TEST-KEY",
+        },
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "user"
+    assert result["errors"].get("base") == "invalid_route" or (
+        result["errors"].get("route") == "invalid_route"
+    )
