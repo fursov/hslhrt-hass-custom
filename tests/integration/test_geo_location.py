@@ -441,10 +441,10 @@ async def test_same_hfp_journey_from_two_stops_has_one_marker_and_survives_owner
         assert marker.attributes["next_tracked_stop"] == "E4971"
         assert marker.attributes["stop_code"] == "E4971"
         assert 0 < marker.attributes["distance_to_next_tracked_stop_km"] < 10
-        # HA's standard distance means straight-line distance from Home.
-        assert marker.attributes["distance"] != (
-            marker.attributes["distance_to_next_tracked_stop_km"]
-        )
+        # HA geolocation distance is the *entity state*, not an attribute.
+        # The new explicitly named stop-distance attribute stays separate.
+        assert "distance" not in marker.attributes
+        assert marker.state not in ("unknown", "unavailable")
 
         # Simulate the first stop's schedule expiring but the second
         # still tracking the exact same journey and receiving fresh GPS.
