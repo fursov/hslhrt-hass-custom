@@ -12,6 +12,30 @@ specific platform/code; different directions often have distinct stop IDs.
 
 ![Select a stop platform](../resources/images/select-stop.png)
 
+### Route filter during initial setup
+
+The initial **Routes** text field accepts `ALL` (all routes), a single
+route (`530`) or multiple routes separated by **commas, spaces or both**:
+
+```text
+158, 530
+158 530
+158,530
+```
+
+All examples above select routes `158` and `530`. Duplicates are removed
+and the list is stored in a canonical order, so `530 158` has the same
+configuration identity as `158,530`. Enter `ALL` **alone** for all
+routes; do not combine `ALL` with a route number. The integration checks
+that **every requested route** serves the selected physical stop and reports
+an error otherwise.
+
+The existing route selector under **Configure** already allows selecting
+multiple routes from a dropdown, without typing separators. It will
+preselect all routes originally supplied in the text field. Existing
+single-route and `ALL` entries are unchanged; selecting new routes in
+Configure does not rename or recreate the existing sensor entities.
+
 ## Routes, destinations and polling
 
 Open **Configure** on the integration entry.
