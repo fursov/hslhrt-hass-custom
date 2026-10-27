@@ -6,7 +6,7 @@
         "description": "Anna pysäkin nimi tai tunnus ja Digitransitin API-avain. Linkki API-portaaliin löytyy README-tiedostosta.",
         "data": {
           "user_name_code": "Pysäkin nimi tai tunnus",
-          "route": "Linja (ALL = kaikki)",
+          "route": "Linjat (ALL tai pilkuilla/välilyönneillä eroteltuna)",
           "destination": "Määränpää (ALL = kaikki)",
           "api_key": "Digitransitin API-avain"
         }

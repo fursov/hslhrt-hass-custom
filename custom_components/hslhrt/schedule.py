@@ -17,6 +17,8 @@ from .const import (
     REALTIME_FRESHNESS_SECONDS,
 )
 
+from .configuration import parse_route_filter
+
 HELSINKI = ZoneInfo("Europe/Helsinki")
 CANCELED_STATES = {"CANCELED", "CANCELLED"}
 
@@ -45,13 +47,21 @@ def select_stop(stops: list[dict], requested: str) -> dict | None:
 def route_matches(stop: dict, route: str, destination: str) -> bool:
     """Validate route/destination against patterns provided for the stop."""
     patterns = stop.get("patterns") or []
-    if route.casefold() != ALL:
-        return any(
-            (pattern.get("route") or {}).get("shortName", "").casefold()
-            == route.casefold()
-            for pattern in patterns
-            if isinstance(pattern, dict)
-        )
+    routes = parse_route_filter(route)
+    if routes:
+        available = set()
+        for pattern in patterns:
+            if not isinstance(pattern, dict):
+                continue
+            route_data = pattern.get("route") or {}
+            if not isinstance(route_data, dict):
+                continue
+            name = route_data.get("shortName")
+            if isinstance(name, str):
+                available.add(name.casefold())
+        # Explicitly reject even one unavailable route instead of
+        # configuring a stop that silently omits part of the selection.
+        return all(name.casefold() in available for name in routes)
     if destination.casefold() != ALL:
         return any(
             destination.casefold() in (pattern.get("headsign") or "").casefold()

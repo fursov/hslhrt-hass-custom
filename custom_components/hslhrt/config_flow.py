@@ -17,6 +17,7 @@ from homeassistant.helpers.selector import (
 from .client import DigitransitAuthError, DigitransitClient, DigitransitError
 from .configuration import (
     available_routes,
+    canonical_route_filter,
     default_selected_routes,
     scan_interval_minutes,
     stop_candidates,
@@ -102,12 +103,15 @@ class HSLHRTConfigFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             name = user_input[NAME_CODE].strip()
             key = user_input[CONF_API_KEY].strip()
+            try:
+                route = canonical_route_filter(_normalized(user_input[ROUTE]))
+            except ValueError:
+                errors[ROUTE] = "invalid_route"
             if not name:
                 errors[NAME_CODE] = "invalid_name_code"
             elif not key:
                 errors[CONF_API_KEY] = "invalid_api_key"
-            else:
-                route = _normalized(user_input[ROUTE])
+            elif not errors:
                 destination = _normalized(user_input[DESTINATION])
                 client = DigitransitClient(async_get_clientsession(self.hass), key)
                 try:

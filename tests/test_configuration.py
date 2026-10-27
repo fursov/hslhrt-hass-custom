@@ -5,6 +5,8 @@ import sys
 import types
 from datetime import timedelta
 from pathlib import Path
+
+import pytest
 from types import SimpleNamespace
 
 INTEGRATION = Path(__file__).resolve().parents[1] / "custom_components" / "hslhrt"
@@ -74,3 +76,48 @@ def test_stop_choices_disambiguate_same_names_and_skip_duplicates():
         "HSL:1", "HSL:2"
     ]
     assert len(config.stop_candidates(stops, limit=1)) == 1
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("ALL", []),
+        ("all", []),
+        ("", []),
+        ("158", ["158"]),
+        ("158, 530", ["158", "530"]),
+        ("158 530", ["158", "530"]),
+        ("158,530", ["158", "530"]),
+        ("530 , 158   158", ["158", "530"]),
+        ("  m1, M1    530 ", ["530", "M1"]),
+    ],
+)
+def test_initial_route_input_accepts_commas_spaces_and_deduplicates(raw, expected):
+    assert config.parse_route_filter(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["ALL,158", "158 all", "ALL ALL", ",,", " ,  "])
+def test_invalid_all_mixtures_and_empty_tokens_are_not_accepted(raw):
+    with pytest.raises(ValueError):
+        config.parse_route_filter(raw)
+
+
+def test_canonical_routes_stabilize_identity_across_input_spelling():
+    assert config.canonical_route_filter("530, 158") == "158,530"
+    assert config.canonical_route_filter("158 530") == "158,530"
+    assert config.canonical_route_filter("158,530,158") == "158,530"
+    assert config.canonical_route_filter("all") == "ALL"
+
+
+def test_legacy_multi_route_data_is_resolved_and_options_defaulted():
+    data = {"route": "158,530", "destination": "ALL"}
+    assert config.default_selected_routes(data, {}) == ["158", "530"]
+    assert config.effective_filters(data, {}) == ("all", "ALL", ["158", "530"])
+    # Explicit route selections in existing OptionsFlow override initial data.
+    overrides = {"routes_filter": ["530"]}
+    assert config.effective_filters(data, overrides) == (
+        "all", "ALL", ["530"]
+    )
+    assert config.effective_filters(data, {"routes_filter": []}) == (
+        "all", "ALL", []
+    )

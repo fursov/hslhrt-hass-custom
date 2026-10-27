@@ -226,3 +226,36 @@ def test_stop_map_timetable_keeps_dst_fold_distinct():
     assert attrs["upcoming_departures_count"] == 2
     assert attrs["next_departure_1"] == "03:30 · A → First"
     assert attrs["next_departure_2"] == "03:30 · B → Second"
+
+
+def test_route_validation_accepts_all_requested_routes_and_rejects_missing():
+    stop = {"patterns": [
+        {"route": {"shortName": "158"}, "headsign": "Matinkylä"},
+        {"route": {"shortName": "530"}, "headsign": "Matinkylä"},
+    ]}
+    for value in ("158 530", "530, 158", "158,530", "158, 530  158"):
+        assert schedule.route_matches(stop, value, "ALL")
+    assert not schedule.route_matches(stop, "158,999", "ALL")
+    assert not schedule.route_matches(stop, "999", "ALL")
+    assert schedule.route_matches(stop, "ALL", "Matinkylä")
+    assert not schedule.route_matches(stop, "ALL", "Kamppi")
+
+
+def test_initial_multi_route_filter_applies_to_parsed_timetable():
+    from hslhrt.configuration import effective_filters
+
+    epoch = 1792702800
+    stop = make_stop([
+        departure(epoch, 100, route="158", destination="Matinkylä"),
+        departure(epoch, 200, route="530", destination="Matinkylä"),
+        departure(epoch, 300, route="8", destination="Matinkylä"),
+    ])
+    route, dest, selected = effective_filters(
+        {"route": "158,530", "destination": "Kamppi"}, {}
+    )
+    assert (route, dest, selected) == ("all", "Kamppi", ["158", "530"])
+    rows = schedule.parse_departures(
+        stop, route, dest, selected
+    )["routes"]
+    assert [row["route"] for row in rows] == ["158", "530"]
+    # The explicit selected-route set takes precedence over destination.
