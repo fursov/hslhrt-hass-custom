@@ -61,21 +61,22 @@ def test_manifest_metadata_and_version():
 
 
 def test_release_095_metadata_is_documented():
-    """The pending release must match its manifest and record prior tags."""
+    """The release notes cover both merged PR28 and the manifest update."""
     manifest = load_json(INTEGRATION / "manifest.json")
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     notes = (ROOT / "docs" / "releases" / "v0.9.5.md").read_text(
         encoding="utf-8"
     )
-    version = manifest["version"]
-    assert version == "0.9.5"
-    assert "## [0.9.5] — Unreleased" in changelog
+    assert manifest["version"] == "0.9.5"
+    assert "## [0.9.5] — 2026-10-27" in changelog
     assert "## [0.9.4] — 2026-10-27" in changelog
     assert "## [0.9.3] — 2026-10-26" in changelog
     assert "## [0.9.2] — 2026-10-26" in changelog
+    assert "PR28" in changelog and "PR28" in notes
+    assert "158, 530" in changelog and "158 530" in notes
     assert "vehicles_transport.public_transport" in notes
     assert "v0.9.5" in notes
-    assert "No runtime changes" in notes
+    assert "draft" not in notes.lower()
 
 def test_hacs_metadata():
     hacs = load_json(ROOT / "hacs.json")
