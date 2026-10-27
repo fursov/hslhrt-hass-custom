@@ -346,3 +346,130 @@ async def test_stop_more_info_configured_departures_refresh_without_extra_api(
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     assert hass.states.get(ident) is None
+
+
+@pytest.mark.asyncio
+async def test_same_hfp_journey_from_two_stops_has_one_marker_and_survives_owner_unload(
+    hass, make_entry, mock_digitransit, stop_response
+):
+    """A bus is drawn once until its last watching stop stops tracking it."""
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    client, _ = mock_digitransit
+    current = time.time()
+    base = stop_response(departure_count=1)
+    first_day = base["stoptimesWithoutPatterns"][0]["serviceDay"]
+
+    def stop_at(stop_id, arrival, code, lat, lon):
+        result = stop_response(departure_count=1)
+        result.update(gtfsId=stop_id, code=code, lat=lat, lon=lon)
+        event = result["stoptimesWithoutPatterns"][0]
+        event.update(
+            scheduledArrival=int(arrival - first_day),
+            realtimeArrival=int(arrival - first_day),
+            trip={
+                "directionId": "0",
+                "departureStoptime": {
+                    "serviceDay": first_day,
+                    "scheduledDeparture": int(current - first_day - 300),
+                },
+                "route": {
+                    "gtfsId": "HSL:10530",
+                    "shortName": "530",
+                    "mode": "BUS",
+                },
+            },
+        )
+        return result
+
+    first = make_entry(route="530", options={
+        "track_vehicles": True, "tracking_horizon_minutes": 30,
+        "tracking_per_route": 2,
+    })
+    second = MockConfigEntry(
+        domain=DOMAIN, unique_id="HSL:2000 530",
+        title="Second (E4972) 530",
+        data={
+            "stop_gtfs": "HSL:2000", "stop_name": "Second",
+            "stop_code": "E4972", "route": "530",
+            "destination": "ALL", "api_key": "TEST-KEY",
+        },
+        options={
+            "track_vehicles": True, "tracking_horizon_minutes": 30,
+            "tracking_per_route": 2,
+        },
+    )
+    responses = {
+        "HSL:1000": stop_at("HSL:1000", current + 300, "E4971", 60.20, 24.90),
+        "HSL:2000": stop_at("HSL:2000", current + 900, "E4972", 60.25, 24.95),
+    }
+    client.get_departures = AsyncMock(side_effect=lambda stop_id: responses[stop_id])
+
+    with (
+        patch("custom_components.hslhrt.hfp.HFPManager._open_worker"),
+        patch("custom_components.hslhrt.hfp.HFPManager._close_worker"),
+    ):
+        first.add_to_hass(hass)
+        second.add_to_hass(hass)
+        assert await hass.config_entries.async_setup(first.entry_id)
+        assert await hass.config_entries.async_setup(second.entry_id)
+        await hass.async_block_till_done()
+
+        manager_a = hass.data[DOMAIN][first.entry_id][HFP_MANAGER]
+        manager_b = hass.data[DOMAIN][second.entry_id][HFP_MANAGER]
+        assert len(manager_a._targets) == len(manager_b._targets) == 1
+        key = next(iter(manager_a._targets))
+        assert key == next(iter(manager_b._targets))
+
+        manager_a._accept_position(key, _position(60.22, 24.92, current))
+        manager_a._notify(force=True)
+        manager_b._accept_position(key, _position(60.23, 24.93, current + 0.5))
+        manager_b._notify(force=True)
+        await hass.async_block_till_done()
+
+        def markers():
+            return [
+                state for state in hass.states.async_all("geo_location")
+                if state.attributes["source"] == "hslhrt"
+            ]
+
+        assert len(markers()) == 1
+        marker = markers()[0]
+        marker_id = marker.entity_id
+        assert marker.attributes["latitude"] == 60.23  # Latest HFP source wins.
+        assert marker.attributes["tracked_stop_codes"] == ["E4971", "E4972"]
+        assert marker.attributes["next_tracked_stop"] == "E4971"
+        assert marker.attributes["stop_code"] == "E4971"
+        assert 0 < marker.attributes["distance_to_next_tracked_stop_km"] < 10
+        # HA's standard distance means straight-line distance from Home.
+        assert marker.attributes["distance"] != (
+            marker.attributes["distance_to_next_tracked_stop_km"]
+        )
+
+        # Simulate the first stop's schedule expiring but the second
+        # still tracking the exact same journey and receiving fresh GPS.
+        manager_a._targets.clear()
+        manager_a._positions.clear()
+        manager_a._notify(force=True)
+        await hass.async_block_till_done()
+        assert len(markers()) == 1
+        assert markers()[0].entity_id == marker_id
+        assert markers()[0].attributes["tracked_stop_codes"] == ["E4972"]
+        assert markers()[0].attributes["next_tracked_stop"] == "E4972"
+
+        # Unloading the original map owner transfers publication to the
+        # remaining config entry without duplicate/number-suffixed markers.
+        assert await hass.config_entries.async_unload(first.entry_id)
+        await hass.async_block_till_done()
+        assert len(markers()) == 1
+        assert markers()[0].entity_id == marker_id
+        assert markers()[0].attributes["tracked_stop_codes"] == ["E4972"]
+
+        manager_b._targets.clear()
+        manager_b._positions.clear()
+        manager_b._notify(force=True)
+        await hass.async_block_till_done()
+        assert markers() == []
+        assert await hass.config_entries.async_unload(second.entry_id)
+        await hass.async_block_till_done()
+        assert hass.states.async_all("geo_location") == []
