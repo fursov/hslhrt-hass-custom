@@ -33,6 +33,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      # The published Hassfest container currently validates HA 2026.10
+      # manifests and rejects the new 2026.11 'categories' key altogether.
+      # Validate the actual category in HACS (separate job) and smoke tests;
+      # feed the old-schema Hassfest a temporary copy without that key,
+      # keeping every other manifest value and validation unchanged.
+      # Remove this compatibility step when Hassfest supports categories.
+      - name: Adapt manifest for older released Hassfest schema
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("custom_components/hslhrt/manifest.json")
+          manifest = json.loads(path.read_text(encoding="utf-8"))
+          categories = manifest.pop("categories", None)
+          assert categories == ["vehicles_transport.public_transport"], categories
+          path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          PY
       - uses: home-assistant/actions/hassfest@master
 
   hacs:
