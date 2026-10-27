@@ -34,6 +34,7 @@ from .vehicle import marker_label, vehicle_icon
 
 SOURCE = DOMAIN
 STOP_SOURCE = f"{DOMAIN}_stops"
+SHARED_MAP_KEY = "_shared_vehicle_map"
 
 
 def stop_coordinates(data: dict | None) -> tuple[float, float] | None:
@@ -97,12 +98,13 @@ def active_positions(rows: list[dict]) -> dict[tuple[str, str, str, str], dict]:
 async def async_setup_entry(hass, config_entry, async_add_entities) -> None:
     """Watch optional HFP updates and publish temporary geolocation entities."""
     data = hass.data[DOMAIN][config_entry.entry_id]
+    registry = hass.data[DOMAIN].get(SHARED_MAP_KEY)
+    if registry is None:
+        registry = HSLHRTSharedVehicleMap(hass)
+        hass.data[DOMAIN][SHARED_MAP_KEY] = registry
     controller = HSLHRTMapController(
-        hass,
-        config_entry,
-        data.get(HFP_MANAGER),
-        async_add_entities,
-        data[COORDINATOR],
+        hass, config_entry, data.get(HFP_MANAGER), async_add_entities,
+        data[COORDINATOR], registry,
     )
     data[GEO_LOCATION_CONTROLLER] = controller
     controller.start()
@@ -201,16 +203,13 @@ class HSLHRTVehicleLocation(GeolocationEvent):
         self._hass_ref = hass
         self._key = key
         self._position = position
-        self._stop_code = entry.data.get("stop_code", "")
         self._retired = False
-        signature = hashlib.sha256(
-            (entry.entry_id + ":" + ":".join(key)).encode()
-        ).hexdigest()[:16]
+        # Physical trip identity is independent of the configured stop.
+        signature = hashlib.sha256(":".join(key).encode()).hexdigest()[:16]
         self.entity_id = f"geo_location.hslhrt_{signature}"
         self._attr_name = (
             f"HSL {position.get('route', '?')} "
-            f"{position.get('destination') or ''} "
-            f"({entry.data.get('stop_code', '')})"
+            f"{position.get('destination') or ''}"
         )
 
     @property
@@ -241,7 +240,13 @@ class HSLHRTVehicleLocation(GeolocationEvent):
         """Expose useful public journey details, but no API key."""
         return {
             ATTR_ATTRIBUTION: ATTRIBUTION,
-            "stop_code": self._stop_code,
+            "stop_code": self._position.get("next_tracked_stop"),
+            "tracked_stop_codes": self._position.get("tracked_stop_codes", []),
+            "next_tracked_stop": self._position.get("next_tracked_stop"),
+            "next_tracked_stop_name": self._position.get("next_tracked_stop_name"),
+            "distance_to_next_tracked_stop_km": self._position.get(
+                "distance_to_next_tracked_stop_km"
+            ),
             "route": self._position.get("route"),
             "vehicle_mode": self._position.get("vehicle_mode"),
             "marker_label": marker_label(
@@ -273,20 +278,155 @@ class HSLHRTVehicleLocation(GeolocationEvent):
             await self.async_remove(force_remove=True)
 
 
+class HSLHRTSharedVehicleMap:
+    """Deduplicate vehicle markers across all stop config entries."""
+
+    def __init__(self, hass) -> None:
+        self._hass = hass
+        self._controllers = {}
+        self._owner_id = None
+        self._entities = {}
+        self._task = None
+        self._dirty = False
+
+    @callback
+    def register(self, controller) -> None:
+        self._controllers[controller._entry.entry_id] = controller
+        self.schedule_sync()
+
+    @callback
+    def schedule_sync(self) -> None:
+        """Only invoke from the Home Assistant event-loop thread."""
+        self._dirty = True
+        if self._task is None or self._task.done():
+            self._task = self._hass.async_create_task(self._async_sync())
+
+    async def unregister(self, controller) -> None:
+        """Retire old platform markers before a different entry takes ownership."""
+        ident = controller._entry.entry_id
+        if self._controllers.get(ident) is not controller:
+            return
+        if self._task is not None:
+            await self._task
+        self._controllers.pop(ident)
+        if self._owner_id == ident:
+            self._owner_id = None
+            for entity in self._entities.values():
+                entity._retired = True
+                if entity.hass is not None:
+                    await entity.async_remove(force_remove=True)
+            self._entities.clear()
+        if self._controllers:
+            self.schedule_sync()
+        else:
+            self._hass.data[DOMAIN].pop(SHARED_MAP_KEY, None)
+
+    def _snapshot(self) -> dict:
+        """Select freshest GPS and collect configured stops per exact trip."""
+        now = time.time()
+        positions = {}
+        tracked = {}
+        for controller in self._controllers.values():
+            if controller._manager is None:
+                continue
+            stop = controller._entry.data
+            code = stop.get(STOP_CODE) or ""
+            name = stop.get(STOP_NAME) or ""
+            stop_id = stop.get(STOP_GTFS) or controller._entry.entry_id
+            coords = stop_coordinates(controller._coordinator.data)
+            for key, row in active_positions(controller._manager.visible()).items():
+                previous = positions.get(key)
+                if previous is None or (
+                    row["position_timestamp"] > previous["position_timestamp"]
+                ):
+                    positions[key] = row
+                eta = row.get("arrival_timestamp")
+                if type(eta) not in (int, float) or not math.isfinite(eta):
+                    eta = None
+                stops = tracked.setdefault(key, {})
+                prior = stops.get(stop_id)
+                if prior is None or (
+                    eta is not None
+                    and (prior["eta"] is None or eta < prior["eta"])
+                ):
+                    stops[stop_id] = {
+                        "code": code, "name": name, "eta": eta, "coords": coords
+                    }
+        for key, position in tuple(positions.items()):
+            stops = list(tracked[key].values())
+            candidates = [
+                s for s in stops if s["eta"] is not None and s["eta"] >= now
+            ]
+            candidates.sort(key=lambda s: s["eta"])
+            nearest_upcoming = candidates[0] if candidates else None
+            distance = None
+            if nearest_upcoming is not None and nearest_upcoming["coords"]:
+                lat, lon = nearest_upcoming["coords"]
+                distance = round(
+                    distance_meters(position["latitude"], position["longitude"],
+                                    lat, lon) / 1000, 2
+                )
+            positions[key] = {
+                **position,
+                "tracked_stop_codes": sorted({
+                    s["code"] for s in stops if s["code"]
+                }),
+                "next_tracked_stop": (
+                    nearest_upcoming["code"] if nearest_upcoming else None
+                ),
+                "next_tracked_stop_name": (
+                    nearest_upcoming["name"] if nearest_upcoming else None
+                ),
+                "distance_to_next_tracked_stop_km": distance,
+            }
+        return positions
+
+    async def _async_sync(self) -> None:
+        while self._dirty:
+            self._dirty = False
+            owner = self._controllers.get(self._owner_id)
+            if owner is None:
+                for controller in self._controllers.values():
+                    if controller._manager is not None and not controller._stopped:
+                        owner = controller
+                        self._owner_id = controller._entry.entry_id
+                        break
+            desired = self._snapshot() if owner is not None else {}
+            for key in tuple(self._entities):
+                if key not in desired:
+                    entity = self._entities.pop(key)
+                    entity._retired = True
+                    if entity.hass is not None:
+                        await entity.async_remove(force_remove=True)
+            additions = []
+            for key, row in desired.items():
+                if key in self._entities:
+                    self._entities[key].update_position(row)
+                else:
+                    entity = HSLHRTVehicleLocation(
+                        self._hass, owner._entry, key, row
+                    )
+                    self._entities[key] = entity
+                    additions.append(entity)
+            if additions:
+                owner._async_add_entities(additions)
+
+
 class HSLHRTMapController:
     """Reconcile Home Assistant map entities with the current HFP positions."""
 
     def __init__(
-        self, hass, entry, manager, async_add_entities: Callable, coordinator
+        self, hass, entry, manager, async_add_entities: Callable, coordinator,
+        registry: HSLHRTSharedVehicleMap,
     ) -> None:
         self._hass = hass
         self._entry = entry
         self._manager = manager
         self._coordinator = coordinator
+        self._registry = registry
         self._async_add_entities = async_add_entities
         self._stop_entity: HSLHRTStopLocation | None = None
         self._remove_coordinator: Callable | None = None
-        self._entities: dict[tuple[str, str, str, str], HSLHRTVehicleLocation] = {}
         self._unsubscribe: Callable | None = None
         self._task: asyncio.Task | None = None
         self._dirty = False
@@ -299,12 +439,15 @@ class HSLHRTMapController:
         )
         if self._manager is not None:
             self._unsubscribe = self._manager.add_listener(self._schedule_sync)
+        self._registry.register(self)
         self._schedule_sync()
 
+    @callback
     def _schedule_sync(self) -> None:
-        """Coalesce rapid MQTT messages into one serialized reconciliation task."""
+        """Keep stop location fresh and reconcile shared vehicles."""
         if self._stopped:
             return
+        self._registry.schedule_sync()
         self._dirty = True
         if self._task is None or self._task.done():
             self._task = self._hass.async_create_task(self._async_sync())
@@ -328,31 +471,6 @@ class HSLHRTMapController:
                 else:
                     self._stop_entity.update_location(coords)
 
-            active = (
-                active_positions(self._manager.visible())
-                if self._manager is not None
-                else {}
-            )
-            desired = set(active)
-            for key in tuple(self._entities):
-                if key not in desired:
-                    entity = self._entities.pop(key)
-                    entity._retired = True
-                    if entity.hass is not None:
-                        await entity.async_remove(force_remove=True)
-
-            additions = []
-            for key, position in active.items():
-                if key in self._entities:
-                    self._entities[key].update_position(position)
-                    continue
-                entity = HSLHRTVehicleLocation(
-                    self._hass, self._entry, key, position
-                )
-                self._entities[key] = entity
-                additions.append(entity)
-            if additions and not self._stopped:
-                self._async_add_entities(additions)
 
     async def async_stop(self) -> None:
         """Unsubscribe before the HA platform unload removes its entities."""
@@ -366,5 +484,5 @@ class HSLHRTMapController:
         if self._task is not None:
             await self._task
             self._task = None
-        self._entities.clear()
+        await self._registry.unregister(self)
         self._stop_entity = None

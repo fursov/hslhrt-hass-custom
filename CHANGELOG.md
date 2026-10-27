@@ -7,6 +7,18 @@ exception for `v0.8.2` is documented below.
 
 ## [Unreleased]
 
+- Deduplicate live HFP map markers across separately configured stops by
+  exact journey identity; a vehicle remains visible while any configured
+  stop is still tracking it, with ownership transferred on stop unload.
+- Preserve the standard Home Assistant geolocation `distance` (distance
+  from Home); expose `next_tracked_stop`, `tracked_stop_codes` and
+  `distance_to_next_tracked_stop_km` (straight-line distance to a
+  configured future stop, not a road or full-route next-stop estimate).
+- Test two stops tracking the same vehicle, independent lifetime and
+  platform ownership transfer; no changes to HFP broker subscriptions.
+
+## [0.9.3] — 2026-10-26
+
 - Read Digitransit's stop-specific scheduled and realtime departure times and
   trip-relative `stopPositionInPattern` without additional API calls.
 - Add `next_departure_N_display` and accompanying source/event/minutes
