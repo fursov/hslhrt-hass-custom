@@ -335,6 +335,7 @@ class HFPManager:
                 "vehicle_mode": trip.get("vehicle_mode"),
                 "destination": trip.get("destination"),
                 "arrival_datetime": trip.get("arrival_datetime"),
+                "arrival_timestamp": trip.get("arrival_timestamp"),
                 "hfp_route_id": key[0],
                 "direction": key[1],
                 "start_time": key[2],
