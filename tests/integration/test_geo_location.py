@@ -410,8 +410,8 @@ async def test_same_hfp_journey_from_two_stops_has_one_marker_and_survives_owner
         patch("custom_components.hslhrt.hfp.HFPManager._close_worker"),
     ):
         first.add_to_hass(hass)
-        second.add_to_hass(hass)
         assert await hass.config_entries.async_setup(first.entry_id)
+        second.add_to_hass(hass)
         assert await hass.config_entries.async_setup(second.entry_id)
         await hass.async_block_till_done()
 
