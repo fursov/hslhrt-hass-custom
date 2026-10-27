@@ -13,7 +13,6 @@ from .const import (
 )
 
 
-
 def parse_route_filter(value: str) -> list[str]:
     """Interpret ALL or route numbers separated by commas and/or whitespace.
 
@@ -26,7 +25,7 @@ def parse_route_filter(value: str) -> list[str]:
         raise ValueError("Route filter must be a string")
     if not value.strip():
         return []
-    tokens = [token for token in re.split(r"[,\\s]+", value.strip()) if token]
+    tokens = [token for token in re.split(r"[,\s]+", value.strip()) if token]
     if not tokens:
         raise ValueError("No route names supplied")
     if any(token.casefold() == ALL for token in tokens):
@@ -41,6 +40,7 @@ def canonical_route_filter(value: str) -> str:
     """Persist a deterministic route string while retaining legacy IDs."""
     routes = parse_route_filter(value)
     return ",".join(routes) if routes else ALL.upper()
+
 
 def available_routes(stop: dict) -> list[str]:
     """Return unique route names serving a stop, sorted for the selector."""
