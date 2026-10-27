@@ -439,6 +439,7 @@ async def test_same_hfp_journey_from_two_stops_has_one_marker_and_survives_owner
         assert marker.attributes["latitude"] == 60.23  # Latest HFP source wins.
         assert marker.attributes["tracked_stop_codes"] == ["E4971", "E4972"]
         assert marker.attributes["next_tracked_stop"] == "E4971"
+        assert marker.attributes["next_tracked_stop_name"] == "Example"
         assert marker.attributes["stop_code"] == "E4971"
         assert 0 < marker.attributes["distance_to_next_tracked_stop_km"] < 10
         # HA geolocation distance is the *entity state*, not an attribute.
@@ -456,6 +457,7 @@ async def test_same_hfp_journey_from_two_stops_has_one_marker_and_survives_owner
         assert markers()[0].entity_id == marker_id
         assert markers()[0].attributes["tracked_stop_codes"] == ["E4972"]
         assert markers()[0].attributes["next_tracked_stop"] == "E4972"
+        assert markers()[0].attributes["next_tracked_stop_name"] == "Second"
 
         # Unloading the original map owner transfers publication to the
         # remaining config entry without duplicate/number-suffixed markers.
