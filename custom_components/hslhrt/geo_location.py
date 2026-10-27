@@ -243,6 +243,7 @@ class HSLHRTVehicleLocation(GeolocationEvent):
             "stop_code": self._position.get("next_tracked_stop"),
             "tracked_stop_codes": self._position.get("tracked_stop_codes", []),
             "next_tracked_stop": self._position.get("next_tracked_stop"),
+            "next_tracked_stop_name": self._position.get("next_tracked_stop_name"),
             "distance_to_next_tracked_stop_km": self._position.get(
                 "distance_to_next_tracked_stop_km"
             ),
@@ -330,6 +331,7 @@ class HSLHRTSharedVehicleMap:
                 continue
             stop = controller._entry.data
             code = stop.get(STOP_CODE) or ""
+            name = stop.get(STOP_NAME) or ""
             stop_id = stop.get(STOP_GTFS) or controller._entry.entry_id
             coords = stop_coordinates(controller._coordinator.data)
             for key, row in active_positions(controller._manager.visible()).items():
@@ -347,7 +349,9 @@ class HSLHRTSharedVehicleMap:
                     eta is not None
                     and (prior["eta"] is None or eta < prior["eta"])
                 ):
-                    stops[stop_id] = {"code": code, "eta": eta, "coords": coords}
+                    stops[stop_id] = {
+                        "code": code, "name": name, "eta": eta, "coords": coords
+                    }
         for key, position in tuple(positions.items()):
             stops = list(tracked[key].values())
             candidates = [
@@ -369,6 +373,9 @@ class HSLHRTSharedVehicleMap:
                 }),
                 "next_tracked_stop": (
                     nearest_upcoming["code"] if nearest_upcoming else None
+                ),
+                "next_tracked_stop_name": (
+                    nearest_upcoming["name"] if nearest_upcoming else None
                 ),
                 "distance_to_next_tracked_stop_km": distance,
             }
